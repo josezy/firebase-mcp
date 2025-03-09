@@ -14,6 +14,8 @@ The server exposes Firebase services through MCP tools, making them accessible t
 
 ## Setup
 
+> The easiest way to install the Firebase MCP server is to simply feed your LLM client (like Cline) the [llms-install.md](./llms-install.md) file.
+
 ### 1. Firebase Configuration
 
 - Go to [Firebase Console](https://console.firebase.google.com)
