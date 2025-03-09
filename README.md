@@ -1,29 +1,16 @@
 # Firebase MCP Server
 
-## What is MCP?
-
-The Model Context Protocol (MCP) is an open protocol that enables seamless integration between LLM applications and external data sources and tools. Created by Anthropic and maintained by the open-source community, MCP provides a standardized way to:
-
-- Access real-time data and external services
-- Perform operations with proper authentication and security
-- Maintain stateful connections and handle complex interactions
-- Execute operations in a controlled, monitored environment
-
-Learn more at:
-
-- [MCP Documentation](https://modelcontextprotocol.io/)
-- [Protocol Specification](https://spec.modelcontextprotocol.io/)
-- [GitHub Repository](https://github.com/modelcontextprotocol)
+![Project Logo](./assets/logo.png)
 
 ## Overview
 
-This MCP server provides a standardized interface to interact with Firebase services including:
+The [Model Context Protocol (MCP)](https://github.com/modelcontextprotocol) is an open protocol that enables seamless integration between LLM applications and external data sources and tools. This MCP server provides a standardized interface to interact with Firebase services including:
 
 - **Authentication**: User management and verification
 - **Firestore**: Document database operations
 - **Storage**: File storage and retrieval
 
-The server exposes these Firebase services through MCP tools, making them accessible to AI models while handling all the authentication and connection management.
+The server exposes Firebase services through MCP tools, making them accessible to LLM clients including [Claude Desktop](https://claude.ai/download), [Cursor](https://www.cursor.com/), [Roo Code](https://github.com/RooVetGit/Roo-Code), and [Cline](https://cline.bot/), while handling authentication and connection management.
 
 ## Setup
 
@@ -214,7 +201,7 @@ npm run build
 
 ### Testing
 
-The project uses Jest for testing. Tests are run against Firebase emulators to avoid affecting production data.
+The project uses Jest for testing. Tests can be run against Firebase emulators to avoid affecting production data.
 
 1. **Install Firebase Emulators**
 
