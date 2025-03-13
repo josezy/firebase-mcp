@@ -8,7 +8,7 @@
 
 ## Overview
 
-The [Model Context Protocol (MCP)](https://github.com/modelcontextprotocol) is an open protocol that enables seamless integration between LLM applications and external data sources and tools. This MCP server provides a standardized interface to interact with Firebase services including:
+The [Model Context Protocol (MCP)](https://github.com/modelcontextprotocol) is an open protocol that enables LLM client applications to use tools and access external data sources. This MCP server allows any LLM client that supports the MCP protocol to interact with Firebase services including:
 
 - **Authentication**: User management and verification
 - **Firestore**: Document database operations
