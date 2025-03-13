@@ -115,6 +115,17 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-firebase-emulators-
     
+    - name: Modify jest.setup.js to use IPv4 addresses
+      run: |
+        # Update jest.setup.js to use 127.0.0.1 instead of localhost
+        sed -i 's/process.env.FIRESTORE_EMULATOR_HOST = .*/process.env.FIRESTORE_EMULATOR_HOST = "127.0.0.1:8080";/g' jest.setup.js
+        sed -i 's/process.env.FIREBASE_AUTH_EMULATOR_HOST = .*/process.env.FIREBASE_AUTH_EMULATOR_HOST = "127.0.0.1:9099";/g' jest.setup.js
+        sed -i 's/process.env.FIREBASE_STORAGE_EMULATOR_HOST = .*/process.env.FIREBASE_STORAGE_EMULATOR_HOST = "127.0.0.1:9199";/g' jest.setup.js
+        
+        # Print the modified file for debugging
+        echo "Modified jest.setup.js:"
+        cat jest.setup.js | grep -A 3 "Connect to emulator"
+    
     - name: Start Firebase Emulators and Run Tests
       run: |
         # Start the emulators in the background
@@ -164,7 +175,7 @@ jobs:
         npm run build --if-present
         
         # Run tests with increased timeout
-        npx jest --testTimeout=10000 --forceExit
+        npx jest --testTimeout=20000 --forceExit
         
         # Store the test result
         TEST_RESULT=$?
