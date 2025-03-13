@@ -6,6 +6,8 @@
   <img width="380" height="200" src="https://glama.ai/mcp/servers/x4i8z2xmrq/badge" alt="Firebase MCP server" />
 </a>
 
+[![Firebase Tests CI](https://github.com/gannonh/firebase-mcp/actions/workflows/firebase-tests.yml/badge.svg)](https://github.com/gannonh/firebase-mcp/actions/workflows/firebase-tests.yml)
+
 ## Overview
 
 The [Model Context Protocol (MCP)](https://github.com/modelcontextprotocol) is an open protocol that enables LLM client applications to use tools and access external data sources. This MCP server allows any LLM client that supports the MCP protocol to interact with Firebase services including:
@@ -90,7 +92,7 @@ MCP Servers can be installed manually or at runtime via npx (recommended). How y
    cd firebase-mcp
    npm install
    ```
-   
+
 ##### Build the Project
 
    ```bash
