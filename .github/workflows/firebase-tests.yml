@@ -37,15 +37,21 @@ jobs:
             "firestore": {
               "rules": "firestore.rules"
             },
+            "storage": {
+              "rules": "storage.rules"
+            },
             "emulators": {
               "auth": {
-                "port": 9099
+                "port": 9099,
+                "host": "127.0.0.1"
               },
               "firestore": {
-                "port": 8080
+                "port": 8080,
+                "host": "127.0.0.1"
               },
               "storage": {
-                "port": 9199
+                "port": 9199,
+                "host": "127.0.0.1"
               },
               "ui": {
                 "enabled": true,
@@ -66,6 +72,17 @@ jobs:
           }
         }' > firestore.rules
         echo "Created firestore.rules"
+        
+        # Create basic storage rules
+        echo 'rules_version = "2";
+        service firebase.storage {
+          match /b/{bucket}/o {
+            match /{allPaths=**} {
+              allow read, write: if true;
+            }
+          }
+        }' > storage.rules
+        echo "Created storage.rules"
         
         # Create .firebaserc with project ID
         echo '{
@@ -98,19 +115,62 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-firebase-emulators-
     
-    - name: Start Firebase Emulators
-      run: firebase emulators:start --project demo-project &
-      env:
-        FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
-    
-    - name: Wait for Emulators to start
-      run: sleep 15
-    
-    - name: Run build
-      run: npm run build --if-present
-      
-    - name: Run tests with emulators
-      run: npm run test:emulator
-      env:
-        USE_FIREBASE_EMULATOR: 'true'
-        SERVICE_ACCOUNT_KEY_PATH: './firebaseServiceKey.json'
+    - name: Start Firebase Emulators and Run Tests
+      run: |
+        # Start the emulators in the background
+        firebase emulators:start --project demo-project > emulator.log 2>&1 &
+        EMULATOR_PID=$!
+        
+        # Give emulators time to start up
+        echo "Waiting for emulators to start..."
+        sleep 20
+        
+        # Check if emulators are running by checking ports
+        echo "Checking if Auth emulator is running on port 9099..."
+        if nc -z 127.0.0.1 9099; then
+          echo "Auth emulator is running"
+        else
+          echo "Auth emulator is not running"
+          cat emulator.log
+          exit 1
+        fi
+        
+        echo "Checking if Firestore emulator is running on port 8080..."
+        if nc -z 127.0.0.1 8080; then
+          echo "Firestore emulator is running"
+        else
+          echo "Firestore emulator is not running"
+          cat emulator.log
+          exit 1
+        fi
+        
+        echo "Checking if Storage emulator is running on port 9199..."
+        if nc -z 127.0.0.1 9199; then
+          echo "Storage emulator is running"
+        else
+          echo "Storage emulator is not running"
+          cat emulator.log
+          exit 1
+        fi
+        
+        # Set environment variables for tests
+        export USE_FIREBASE_EMULATOR=true
+        export SERVICE_ACCOUNT_KEY_PATH="./firebaseServiceKey.json"
+        export FIRESTORE_EMULATOR_HOST="127.0.0.1:8080"
+        export FIREBASE_AUTH_EMULATOR_HOST="127.0.0.1:9099"
+        export FIREBASE_STORAGE_EMULATOR_HOST="127.0.0.1:9199"
+        
+        # Run build
+        npm run build --if-present
+        
+        # Run tests with increased timeout
+        npx jest --testTimeout=10000 --forceExit
+        
+        # Store the test result
+        TEST_RESULT=$?
+        
+        # Kill the emulator process
+        kill $EMULATOR_PID
+        
+        # Return the test result
+        exit $TEST_RESULT
