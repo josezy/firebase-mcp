@@ -183,9 +183,8 @@ jobs:
         # Run build
         npm run build --if-present
         
-        # Run tests with increased timeout and run auth tests first
-        npx jest src/lib/firebase/__tests__/authClient.test.ts --testTimeout=30000 --forceExit && \
-        npx jest src/lib/firebase/__tests__/firestoreClient.test.ts src/lib/firebase/__tests__/storageClient.test.ts --testTimeout=30000 --forceExit
+        # Run all tests with increased timeout
+        npx jest --testTimeout=30000 --forceExit
         
         # Store the test result
         TEST_RESULT=$?
