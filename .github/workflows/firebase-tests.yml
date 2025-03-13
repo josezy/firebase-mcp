@@ -122,6 +122,9 @@ jobs:
         sed -i 's/process.env.FIREBASE_AUTH_EMULATOR_HOST = .*/process.env.FIREBASE_AUTH_EMULATOR_HOST = "127.0.0.1:9099";/g' jest.setup.js
         sed -i 's/process.env.FIREBASE_STORAGE_EMULATOR_HOST = .*/process.env.FIREBASE_STORAGE_EMULATOR_HOST = "127.0.0.1:9199";/g' jest.setup.js
         
+        # Modify the test user creation to be more reliable
+        sed -i 's/beforeAll(async () => {/beforeAll(async () => {\n  jest.setTimeout(30000);/g' jest.setup.js
+        
         # Print the modified file for debugging
         echo "Modified jest.setup.js:"
         cat jest.setup.js | grep -A 3 "Connect to emulator"
@@ -164,6 +167,12 @@ jobs:
           exit 1
         fi
         
+        # Create test user directly in the Auth emulator
+        echo "Creating test user directly in Auth emulator..."
+        curl -X POST "http://127.0.0.1:9099/identitytoolkit.googleapis.com/v1/projects/demo-project/accounts" \
+          -H "Content-Type: application/json" \
+          --data-binary '{"localId":"testid","email":"test@example.com","password":"password123","emailVerified":true}'
+        
         # Set environment variables for tests
         export USE_FIREBASE_EMULATOR=true
         export SERVICE_ACCOUNT_KEY_PATH="./firebaseServiceKey.json"
@@ -174,8 +183,9 @@ jobs:
         # Run build
         npm run build --if-present
         
-        # Run tests with increased timeout
-        npx jest --testTimeout=20000 --forceExit
+        # Run tests with increased timeout and run auth tests first
+        npx jest src/lib/firebase/__tests__/authClient.test.ts --testTimeout=30000 --forceExit && \
+        npx jest src/lib/firebase/__tests__/firestoreClient.test.ts src/lib/firebase/__tests__/storageClient.test.ts --testTimeout=30000 --forceExit
         
         # Store the test result
         TEST_RESULT=$?
