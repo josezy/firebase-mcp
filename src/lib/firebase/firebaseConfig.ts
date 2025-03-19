@@ -68,7 +68,7 @@ function initializeFirebase(): admin.app.App | null {
       }
 
       // Get bucket name from environment variable or use default format
-      const storageBucket = process.env.FIREBASE_STORAGE_BUCKET || `${projectId}.appspot.com`;
+      const storageBucket = process.env.FIREBASE_STORAGE_BUCKET || `${projectId}.firebasestorage.app`;
       console.error(`Initializing Firebase with bucket name: ${storageBucket}`);
 
       // Initialize Firebase Admin SDK with the service account and storage configuration

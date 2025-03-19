@@ -49,14 +49,25 @@ function getBucketName(projectId: string): string {
     return storageBucket;
   }
   
+  // Special handling for emulator environment
+  const isEmulator = process.env.FIREBASE_STORAGE_EMULATOR_HOST || 
+                     process.env.USE_FIREBASE_EMULATOR === 'true' || 
+                     process.env.NODE_ENV === 'test';
+  
+  if (isEmulator) {
+    console.error(`Using emulator bucket format for project: ${projectId}`);
+    return `${projectId}.firebasestorage.app`;
+  }
+  
   // Try different bucket name formats as fallbacks
   const possibleBucketNames = [
-    `${projectId}.appspot.com`,
     `${projectId}.firebasestorage.app`,
+    `${projectId}.appspot.com`,
     projectId
   ];
   
   console.error(`No FIREBASE_STORAGE_BUCKET environment variable set. Trying default bucket names: ${possibleBucketNames.join(', ')}`);
+  console.error(`DEBUG: Using first bucket name: ${possibleBucketNames[0]}`);
   return possibleBucketNames[0]; // Default to first format
 }
 
@@ -85,6 +96,7 @@ export async function listDirectoryFiles(path?: string, pageSize: number = 10, p
   try {
     // Check if Firebase is initialized
     if (!admin) {
+      console.error('DEBUG: Firebase admin is not initialized');
       return { 
         content: [{ type: 'text', text: 'Firebase is not initialized. SERVICE_ACCOUNT_KEY_PATH environment variable is required.' }], 
         isError: true 
@@ -95,6 +107,16 @@ export async function listDirectoryFiles(path?: string, pageSize: number = 10, p
     const projectId = getProjectId();
     console.error(`Project ID: ${projectId}`);
     
+    // DEBUG: Check if we can access storage()
+    console.error(`DEBUG: Attempting to access admin.storage()`);
+    let adminStorage;
+    try {
+      adminStorage = admin.storage();
+      console.error(`DEBUG: Successfully accessed admin.storage()`);
+    } catch (error) {
+      console.error(`DEBUG: Failed to access admin.storage(): ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+
     // Try to get the default bucket first
     let bucket;
     try {
@@ -192,9 +214,7 @@ export async function listDirectoryFiles(path?: string, pageSize: number = 10, p
 4. Complete the initial setup to create a storage bucket
 5. Set the appropriate security rules
 
-Once a storage bucket exists for your project, the storage_list_files function will work properly.
-
-Note: The URI you provided (gs://astrolabs-recovery-coach-app.firebasestorage.app/illustrations/lessons) suggests your bucket name might be "astrolabs-recovery-coach-app.firebasestorage.app" instead of the default format.`
+Once a storage bucket exists for your project, the storage_list_files function will work properly.`
         }], 
         isError: true 
       };
@@ -308,9 +328,7 @@ export async function getFileInfo(filePath: string): Promise<StorageResponse> {
 4. Complete the initial setup to create a storage bucket
 5. Set the appropriate security rules
 
-Once a storage bucket exists for your project, the storage_get_file_info function will work properly.
-
-Note: The URI you provided (gs://astrolabs-recovery-coach-app.firebasestorage.app/illustrations/lessons) suggests your bucket name might be "astrolabs-recovery-coach-app.firebasestorage.app" instead of the default format.`
+Once a storage bucket exists for your project, the storage_get_file_info function will work properly.`
         }], 
         isError: true 
       };

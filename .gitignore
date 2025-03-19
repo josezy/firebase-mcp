@@ -62,4 +62,4 @@ dist
 firebaseServiceKey.json
 
 .specstory/
-
+.cursor/
