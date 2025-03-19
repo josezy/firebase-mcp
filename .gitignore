@@ -59,7 +59,8 @@ dist
 .yarn/install-state.gz
 .pnp.*
 .DS_Store
-firebaseServiceKey.json
 
+# project specific files
+firebaseServiceKey.json
 .specstory/
 .cursor/
