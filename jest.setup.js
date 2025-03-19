@@ -24,7 +24,7 @@ function initializeFirebase() {
       admin.initializeApp({
         credential: admin.credential.cert(serviceAccount),
         projectId: serviceAccount.project_id,
-        storageBucket: `${serviceAccount.project_id}.appspot.com`
+        storageBucket: `${serviceAccount.project_id}.firebasestorage.app`
       });
 
       console.log('Firebase initialized for testing');

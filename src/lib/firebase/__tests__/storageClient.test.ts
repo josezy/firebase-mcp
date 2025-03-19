@@ -1,5 +1,8 @@
 import { listDirectoryFiles, getFileInfo } from '../storageClient';
 import { admin } from '../firebaseConfig';
+import * as admin_module from 'firebase-admin';
+import * as fs from 'fs';
+import * as path from 'path';
 
 /**
  * Storage Client Tests
@@ -20,10 +23,82 @@ const testDirectory = 'test-directory';
 const testFilePath = 'test-file.txt';
 const nonExistentPath = 'non-existent-path/file.txt';
 
+// Create a test ID generator to track test runs
+let testRunCounter = 0;
+function getTestRunId() {
+  return `Run-${++testRunCounter}`;
+}
+
+// Utility function for better logging
+function logWithContext(testRunId: string, message: string) {
+  const timestamp = new Date().toISOString();
+  console.log(`[${timestamp}][${testRunId}] ${message}`);
+}
+
+// Ensure Firebase connection is active for each test
+beforeEach(async () => {
+  const testRunId = getTestRunId();
+  
+  // If Firebase is not initialized, initialize it
+  if (admin_module.apps.length === 0) {
+    logWithContext(testRunId, 'Firebase not initialized, initializing now...');
+    const serviceAccountPath = process.env.SERVICE_ACCOUNT_KEY_PATH || 
+      path.resolve(process.cwd(), 'firebaseServiceKey.json');
+    const serviceAccount = JSON.parse(fs.readFileSync(serviceAccountPath, 'utf8'));
+    
+    admin_module.initializeApp({
+      credential: admin_module.credential.cert(serviceAccount),
+      projectId: serviceAccount.project_id,
+      storageBucket: `${serviceAccount.project_id}.firebasestorage.app`
+    });
+    
+    // Set emulator environment variables
+    process.env.FIRESTORE_EMULATOR_HOST = 'localhost:8080';
+    process.env.FIREBASE_AUTH_EMULATOR_HOST = 'localhost:9099';
+    process.env.FIREBASE_STORAGE_EMULATOR_HOST = 'localhost:9199';
+    logWithContext(testRunId, 'Firebase reinitialized for storage tests');
+  } else {
+    logWithContext(testRunId, 'Using existing Firebase initialization');
+  }
+  
+  // Create a test file in the storage emulator to ensure the bucket is accessible
+  try {
+    logWithContext(testRunId, 'Attempting to create test file in storage emulator');
+    
+    // Try to get a bucket reference
+    const bucket = admin_module.storage().bucket();
+    
+    // Create a test file with some content
+    const testFileContent = Buffer.from(`This is a test file for run ${testRunId}`);
+    const tempFilePath = path.join(process.cwd(), `temp-test-file-${testRunId}.txt`);
+    
+    // Write the file to local filesystem first
+    fs.writeFileSync(tempFilePath, testFileContent);
+    
+    // Upload to the bucket
+    await bucket.upload(tempFilePath, {
+      destination: `${testFilePath}-${testRunId}`,
+      metadata: {
+        contentType: 'text/plain',
+      }
+    });
+    
+    // Delete the temporary file
+    fs.unlinkSync(tempFilePath);
+    
+    logWithContext(testRunId, `Successfully created test file: ${testFilePath}-${testRunId}`);
+  } catch (error) {
+    logWithContext(testRunId, `Error creating test file: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
+});
+
 describe('Storage Client', () => {
   describe('listDirectoryFiles', () => {
     // Test listing files in root directory
     it('should list files in the root directory', async () => {
+      const testRunId = getTestRunId();
+      logWithContext(testRunId, 'Starting test: should list files in the root directory');
+      
       const result = await listDirectoryFiles(rootPath) as StorageResponse;
       
       // Verify the response format
@@ -32,7 +107,7 @@ describe('Storage Client', () => {
       
       // Check if we got an error response
       if (result.isError) {
-        console.log(`Error response: ${result.content[0].text}`);
+        logWithContext(testRunId, `Error response: ${result.content[0].text}`);
         // Skip JSON parsing tests if we got an error
         return;
       }
@@ -47,11 +122,16 @@ describe('Storage Client', () => {
         expect(responseData.hasMore !== undefined).toBe(true);
         
         // Log for debugging
-        console.log(responseData);
+        logWithContext(testRunId, `Found ${responseData.files.length} files/directories`);
+        if (responseData.files.length > 0) {
+          logWithContext(testRunId, `First item: ${JSON.stringify(responseData.files[0])}`);
+        }
       } catch (error) {
-        console.error(`Failed to parse JSON: ${result.content[0].text}`);
+        logWithContext(testRunId, `Failed to parse JSON: ${result.content[0].text}`);
         // Don't fail the test if we can't parse JSON
       }
+      
+      logWithContext(testRunId, 'Completed test: should list files in the root directory');
     });
 
     // Test with pagination parameters
