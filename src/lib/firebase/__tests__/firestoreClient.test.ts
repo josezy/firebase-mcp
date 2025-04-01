@@ -350,5 +350,26 @@ describe('Firestore Client', () => {
         process.env.SERVICE_ACCOUNT_KEY_PATH = originalPath;
       }
     });
+
+    // Test error handling when SERVICE_ACCOUNT_KEY_PATH is not set
+    it('should handle missing service account path for list_collections', async () => {
+      // Save the original service account path
+      const originalPath = process.env.SERVICE_ACCOUNT_KEY_PATH;
+      
+      try {
+        // Clear the service account path
+        delete process.env.SERVICE_ACCOUNT_KEY_PATH;
+        
+        // Call the function
+        const result = await list_collections();
+        
+        // Verify error response
+        expect(result.isError).toBe(true);
+        expect(result.content[0].text).toBe('Service account path not set');
+      } finally {
+        // Restore the original service account path
+        process.env.SERVICE_ACCOUNT_KEY_PATH = originalPath;
+      }
+    });
   });
 });
