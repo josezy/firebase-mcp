@@ -72,13 +72,10 @@ describe('Authentication Client', () => {
     it('should return user data when a valid UID is provided', async () => {
       const result = await getUserByIdOrEmail(testId);
       
-      console.log('User by ID response:', JSON.stringify(result, null, 2));
-      
       // Verify the response format
       expect(result.content).toBeDefined();
       expect(result.content.length).toBe(1);
-      
-      // Don't check isError property if it's giving inconsistent results
+      expect(result.isError).toBeUndefined();
       
       // Parse the response
       const responseData = JSON.parse(result.content[0].text);
@@ -93,13 +90,10 @@ describe('Authentication Client', () => {
     it('should return user data when a valid email is provided', async () => {
       const result = await getUserByIdOrEmail(testEmail);
       
-      console.log('User by email response:', JSON.stringify(result, null, 2));
-      
       // Verify the response format
       expect(result.content).toBeDefined();
       expect(result.content.length).toBe(1);
-      
-      // Don't check isError property if it's giving inconsistent results
+      expect(result.isError).toBeUndefined();
       
       // Parse the response
       const responseData = JSON.parse(result.content[0].text);
