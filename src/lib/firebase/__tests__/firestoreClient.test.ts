@@ -1,8 +1,10 @@
 import { getDocument, updateDocument, deleteDocument, addDocument, listDocuments, list_collections } from '../firestoreClient';
 import { admin } from '../firebaseConfig';
 import { logger } from '../../../utils/logger';
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { vi } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
+
+// Test imports for mocking
+import * as firebaseConfig from '../firebaseConfig';
 
 /**
  * Firestore Client Tests
@@ -83,6 +85,30 @@ describe('Firestore Client', () => {
       // Verify error response
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toBe('Document not found: non-existent-doc');
+    });
+
+    // Test error handling when getProjectId returns null
+    it('should handle null project ID gracefully', async () => {
+      // Save original implementation
+      const originalGetProjectId = firebaseConfig.getProjectId;
+      
+      try {
+        // Mock getProjectId to return null
+        vi.spyOn(firebaseConfig, 'getProjectId').mockReturnValue(null);
+        
+        // Set service account path to ensure code path is executed
+        process.env.SERVICE_ACCOUNT_KEY_PATH = '/path/to/service-account.json';
+        
+        // Call the function
+        const result = await getDocument(testCollection, testDocId);
+        
+        // Verify error response
+        expect(result.isError).toBe(true);
+        expect(result.content[0].text).toBe('Could not determine project ID');
+      } finally {
+        // Restore original implementation
+        vi.restoreAllMocks();
+      }
     });
   });
 
