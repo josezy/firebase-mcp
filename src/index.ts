@@ -175,6 +175,64 @@ class FirebaseMcpServer {
           }
         },
         {
+          name: 'firestore_get_document',
+          description: 'Get a document from a Firestore collection',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              collection: {
+                type: 'string',
+                description: 'Collection name'
+              },
+              id: {
+                type: 'string',
+                description: 'Document ID'
+              }
+            },
+            required: ['collection', 'id']
+          }
+        },
+        {
+          name: 'firestore_update_document',
+          description: 'Update a document in a Firestore collection',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              collection: {
+                type: 'string',
+                description: 'Collection name'
+              },
+              id: {
+                type: 'string',
+                description: 'Document ID'
+              },
+              data: {
+                type: 'object',
+                description: 'Updated document data'
+              }
+            },
+            required: ['collection', 'id', 'data']
+          }
+        },
+        {
+          name: 'firestore_delete_document',
+          description: 'Delete a document from a Firestore collection',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              collection: {
+                type: 'string',
+                description: 'Collection name'
+              },
+              id: {
+                type: 'string',
+                description: 'Document ID'
+              }
+            },
+            required: ['collection', 'id']
+          }
+        },
+        {
           name: 'firestore_list_collections',
           description: 'List root collections in Firestore',
           inputSchema: {
@@ -195,7 +253,9 @@ class FirebaseMcpServer {
           return {
             content: [{
               type: 'text',
-              text: 'Firebase initialization failed'
+              text: JSON.stringify({
+                error: 'Firebase initialization failed'
+              })
             }]
           };
         }
@@ -305,6 +365,92 @@ class FirebaseMcpServer {
                 text: JSON.stringify({
                   documents,
                   nextPageToken
+                })
+              }]
+            };
+          }
+
+          case 'firestore_get_document': {
+            const collection = args.collection as string;
+            const id = args.id as string;
+            
+            const docRef = admin.firestore().collection(collection).doc(id);
+            const doc = await docRef.get();
+            
+            if (!doc.exists) {
+              return {
+                content: [{
+                  type: 'text',
+                  text: JSON.stringify({
+                    error: 'Document not found'
+                  })
+                }]
+              };
+            }
+
+            const rawData = doc.data();
+            // Sanitize data to ensure it's JSON-serializable
+            const data = Object.entries(rawData || {}).reduce((acc, [key, value]) => {
+              if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean' || value === null) {
+                acc[key] = value;
+              } else if (value instanceof Date) {
+                acc[key] = value.toISOString();
+              } else if (Array.isArray(value)) {
+                acc[key] = `[${value.join(', ')}]`;
+              } else if (typeof value === 'object') {
+                acc[key] = '[Object]';
+              } else {
+                acc[key] = String(value);
+              }
+              return acc;
+            }, {} as Record<string, any>);
+
+            return {
+              content: [{
+                type: 'text',
+                text: JSON.stringify({
+                  id: doc.id,
+                  path: doc.ref.path,
+                  data
+                })
+              }]
+            };
+          }
+
+          case 'firestore_update_document': {
+            const collection = args.collection as string;
+            const id = args.id as string;
+            const data = args.data as Record<string, any>;
+            
+            const docRef = admin.firestore().collection(collection).doc(id);
+            await docRef.update(data);
+            
+            return {
+              content: [{
+                type: 'text',
+                text: JSON.stringify({
+                  id,
+                  path: docRef.path,
+                  updated: true
+                })
+              }]
+            };
+          }
+
+          case 'firestore_delete_document': {
+            const collection = args.collection as string;
+            const id = args.id as string;
+            
+            const docRef = admin.firestore().collection(collection).doc(id);
+            await docRef.delete();
+            
+            return {
+              content: [{
+                type: 'text',
+                text: JSON.stringify({
+                  id,
+                  path: docRef.path,
+                  deleted: true
                 })
               }]
             };
