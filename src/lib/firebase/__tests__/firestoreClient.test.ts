@@ -190,6 +190,36 @@ describe('Firestore Client', () => {
         process.env.SERVICE_ACCOUNT_KEY_PATH = originalPath;
       }
     });
+
+    // Test error handling when getProjectId returns null
+    it('should handle null project ID gracefully for addDocument', async () => {
+      // Save service account path to restore later
+      const originalPath = process.env.SERVICE_ACCOUNT_KEY_PATH;
+      
+      try {
+        // Mock getProjectId to return null for this test only
+        vi.spyOn(firebaseConfig, 'getProjectId').mockReturnValue(null);
+        
+        // Set service account path to ensure code path is executed
+        process.env.SERVICE_ACCOUNT_KEY_PATH = '/path/to/service-account.json';
+        
+        // Data for new document
+        const newDocData = {
+          name: 'Test Doc',
+          timestamp: new Date().toISOString()
+        };
+        
+        // Call the function
+        const result = await addDocument(testCollection, newDocData);
+        
+        // Verify error response
+        expect(result.isError).toBe(true);
+        expect(result.content[0].text).toBe('Could not determine project ID');
+      } finally {
+        // Restore service account path
+        process.env.SERVICE_ACCOUNT_KEY_PATH = originalPath;
+      }
+    });
   });
 
   describe('updateDocument', () => {
@@ -250,6 +280,36 @@ describe('Firestore Client', () => {
         expect(result.content[0].text).toBe('Service account path not set');
       } finally {
         // Restore the original service account path
+        process.env.SERVICE_ACCOUNT_KEY_PATH = originalPath;
+      }
+    });
+
+    // Test error handling when getProjectId returns null
+    it('should handle null project ID gracefully for updateDocument', async () => {
+      // Save service account path to restore later
+      const originalPath = process.env.SERVICE_ACCOUNT_KEY_PATH;
+      
+      try {
+        // Mock getProjectId to return null for this test only
+        vi.spyOn(firebaseConfig, 'getProjectId').mockReturnValue(null);
+        
+        // Set service account path to ensure code path is executed
+        process.env.SERVICE_ACCOUNT_KEY_PATH = '/path/to/service-account.json';
+        
+        // Data for document update
+        const updateData = {
+          name: 'Updated Test Doc',
+          timestamp: new Date().toISOString()
+        };
+        
+        // Call the function
+        const result = await updateDocument(testCollection, testDocId, updateData);
+        
+        // Verify error response
+        expect(result.isError).toBe(true);
+        expect(result.content[0].text).toBe('Could not determine project ID');
+      } finally {
+        // Restore service account path
         process.env.SERVICE_ACCOUNT_KEY_PATH = originalPath;
       }
     });
