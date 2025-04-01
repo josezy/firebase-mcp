@@ -34,7 +34,8 @@ function initializeFirebase() {
 
     const serviceAccount = require(serviceAccountPath);
     return admin.initializeApp({
-      credential: admin.credential.cert(serviceAccount)
+      credential: admin.credential.cert(serviceAccount),
+      storageBucket: process.env.FIREBASE_STORAGE_BUCKET
     });
   } catch (error) {
     return null;
@@ -230,6 +231,48 @@ class FirebaseMcpServer {
               }
             },
             required: ['collection', 'id']
+          }
+        },
+        {
+          name: 'auth_get_user',
+          description: 'Get a user by ID or email from Firebase Authentication',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              identifier: {
+                type: 'string',
+                description: 'User ID or email address'
+              }
+            },
+            required: ['identifier']
+          }
+        },
+        {
+          name: 'storage_list_files',
+          description: 'List files in a given path in Firebase Storage',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              directoryPath: {
+                type: 'string',
+                description: 'The optional path to list files from. If not provided, the root is used.'
+              }
+            },
+            required: []
+          }
+        },
+        {
+          name: 'storage_get_file_info',
+          description: 'Get file information including metadata and download URL',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              filePath: {
+                type: 'string',
+                description: 'The path of the file to get information for'
+              }
+            },
+            required: ['filePath']
           }
         },
         {
@@ -454,6 +497,145 @@ class FirebaseMcpServer {
                 })
               }]
             };
+          }
+
+          case 'auth_get_user': {
+            const identifier = args.identifier as string;
+            
+            try {
+              let user;
+              // Try to get user by email first
+              if (identifier.includes('@')) {
+                const userByEmail = await admin.auth().getUserByEmail(identifier);
+                user = userByEmail;
+              } else {
+                // If not an email, try by UID
+                const userById = await admin.auth().getUser(identifier);
+                user = userById;
+              }
+
+              // Sanitize user data to ensure it's JSON-serializable
+              const sanitizedUser = {
+                uid: user.uid,
+                email: user.email,
+                emailVerified: user.emailVerified,
+                displayName: user.displayName,
+                photoURL: user.photoURL,
+                disabled: user.disabled,
+                metadata: {
+                  creationTime: user.metadata.creationTime,
+                  lastSignInTime: user.metadata.lastSignInTime
+                }
+              };
+
+              return {
+                content: [{
+                  type: 'text',
+                  text: JSON.stringify({ user: sanitizedUser })
+                }]
+              };
+            } catch (error) {
+              return {
+                content: [{
+                  type: 'text',
+                  text: JSON.stringify({
+                    error: 'User not found',
+                    details: error instanceof Error ? error.message : 'Unknown error'
+                  })
+                }]
+              };
+            }
+          }
+
+          case 'storage_list_files': {
+            const directoryPath = (args.directoryPath as string) || '';
+            
+            try {
+              const bucket = admin.storage().bucket();
+              const [files] = await bucket.getFiles({
+                prefix: directoryPath,
+                delimiter: '/'
+              });
+
+              const fileList = files.map(file => ({
+                name: file.name,
+                size: file.metadata.size ? file.metadata.size : '0',
+                contentType: file.metadata.contentType || null,
+                updated: file.metadata.updated || null,
+                md5Hash: file.metadata.md5Hash || null
+              }));
+
+              return {
+                content: [{
+                  type: 'text',
+                  text: JSON.stringify({ files: fileList }, null, 2)
+                }]
+              };
+            } catch (error) {
+              return {
+                content: [{
+                  type: 'text',
+                  text: JSON.stringify({
+                    error: 'Failed to list files',
+                    details: error instanceof Error ? error.message : 'Unknown error'
+                  })
+                }]
+              };
+            }
+          }
+
+          case 'storage_get_file_info': {
+            const filePath = args.filePath as string;
+            
+            try {
+              const bucket = admin.storage().bucket();
+              const file = bucket.file(filePath);
+              
+              const [exists] = await file.exists();
+              if (!exists) {
+                return {
+                  content: [{
+                    type: 'text',
+                    text: JSON.stringify({
+                      error: 'File not found'
+                    }, null, 2)
+                  }]
+                };
+              }
+
+              const [metadata] = await file.getMetadata();
+              const [url] = await file.getSignedUrl({
+                action: 'read',
+                expires: Date.now() + 15 * 60 * 1000 // URL expires in 15 minutes
+              });
+
+              const fileInfo = {
+                name: file.name,
+                bucket: file.bucket.name,
+                size: metadata.size || '0',
+                contentType: metadata.contentType || null,
+                updated: metadata.updated || null,
+                md5Hash: metadata.md5Hash || null,
+                downloadUrl: url
+              };
+
+              return {
+                content: [{
+                  type: 'text',
+                  text: JSON.stringify(fileInfo, null, 2)
+                }]
+              };
+            } catch (error) {
+              return {
+                content: [{
+                  type: 'text',
+                  text: JSON.stringify({
+                    error: 'Failed to get file info',
+                    details: error instanceof Error ? error.message : 'Unknown error'
+                  })
+                }]
+              };
+            }
           }
 
           case 'firestore_list_collections':
