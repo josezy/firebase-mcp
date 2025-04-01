@@ -171,10 +171,39 @@ class FirebaseMcpServer {
             const collection = args.collection as string;
             const snapshot = await admin.firestore().collection(collection).get();
             
-            const documents = snapshot.docs.map(doc => ({
-              id: doc.id,
-              path: doc.ref.path
-            }));
+            const documents = snapshot.docs.map(doc => {
+              const rawData = doc.data();
+              // Sanitize data to ensure it's JSON-serializable
+              const data = Object.entries(rawData).reduce((acc, [key, value]) => {
+                // Handle basic types directly
+                if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean' || value === null) {
+                  acc[key] = value;
+                }
+                // Convert Date objects to ISO strings
+                else if (value instanceof Date) {
+                  acc[key] = value.toISOString();
+                }
+                // Convert arrays to strings
+                else if (Array.isArray(value)) {
+                  acc[key] = `[${value.join(', ')}]`;
+                }
+                // Convert other objects to string representation
+                else if (typeof value === 'object') {
+                  acc[key] = '[Object]';
+                }
+                // Convert other types to strings
+                else {
+                  acc[key] = String(value);
+                }
+                return acc;
+              }, {} as Record<string, any>);
+
+              return {
+                id: doc.id,
+                path: doc.ref.path,
+                data
+              };
+            });
             
             return {
               content: [{
