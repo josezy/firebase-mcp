@@ -326,5 +326,29 @@ describe('Firestore Client', () => {
       expect(collection.path).toBeDefined();
       expect(collection.url).toBeDefined();
     });
+
+    // Test error handling when getProjectId returns null
+    it('should handle null project ID gracefully for list_collections', async () => {
+      // Save service account path to restore later
+      const originalPath = process.env.SERVICE_ACCOUNT_KEY_PATH;
+      
+      try {
+        // Mock getProjectId to return null for this test only
+        vi.spyOn(firebaseConfig, 'getProjectId').mockReturnValue(null);
+        
+        // Set service account path to ensure code path is executed
+        process.env.SERVICE_ACCOUNT_KEY_PATH = '/path/to/service-account.json';
+        
+        // Call the function
+        const result = await list_collections();
+        
+        // Verify error response
+        expect(result.isError).toBe(true);
+        expect(result.content[0].text).toBe('Could not determine project ID');
+      } finally {
+        // Restore service account path
+        process.env.SERVICE_ACCOUNT_KEY_PATH = originalPath;
+      }
+    });
   });
 });
