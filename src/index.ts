@@ -119,6 +119,11 @@ class FirebaseMcpServer {
               collection: {
                 type: 'string',
                 description: 'Collection name'
+              },
+              limit: {
+                type: 'number',
+                description: 'Maximum number of documents to return',
+                default: 10
               }
             },
             required: ['collection']
@@ -169,7 +174,12 @@ class FirebaseMcpServer {
 
           case 'firestore_list_documents': {
             const collection = args.collection as string;
-            const snapshot = await admin.firestore().collection(collection).get();
+            const limit = Math.min(Math.max(1, (args.limit as number) || 10), 100); // Limit between 1 and 100
+            
+            const snapshot = await admin.firestore()
+              .collection(collection)
+              .limit(limit)
+              .get();
             
             const documents = snapshot.docs.map(doc => {
               const rawData = doc.data();
