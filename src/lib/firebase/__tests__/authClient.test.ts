@@ -1,6 +1,8 @@
 import { getUserByIdOrEmail } from '../authClient';
 import { admin } from '../firebaseConfig';
 import { logger } from '../../../utils/logger';
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { vi } from 'vitest';
 
 /**
  * Authentication Client Tests
@@ -122,8 +124,8 @@ describe('Authentication Client', () => {
 
     // Test error handling for Firebase initialization issues
     it('should handle Firebase initialization issues', async () => {
-      // Use jest.spyOn to mock the admin.auth method
-      const authSpy = jest.spyOn(admin, 'auth').mockImplementation(() => {
+      // Use vi.spyOn to mock the admin.auth method
+      const authSpy = vi.spyOn(admin, 'auth').mockImplementation(() => {
         throw new Error('Firebase not initialized');
       });
 

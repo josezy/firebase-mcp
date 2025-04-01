@@ -4,6 +4,8 @@ import * as admin_module from 'firebase-admin';
 import * as fs from 'fs';
 import * as path from 'path';
 import { logger } from '../../../utils/logger';
+import { describe, it, expect, beforeEach } from 'vitest';
+import { vi } from 'vitest';
 
 /**
  * Storage Client Tests
@@ -117,8 +119,8 @@ describe('Storage Client', () => {
 
     // Test error handling for Firebase initialization issues
     it('should handle Firebase initialization issues', async () => {
-      // Use jest.spyOn to mock the admin.storage method
-      const storageSpy = jest.spyOn(admin, 'storage').mockImplementation(() => {
+      // Use vi.spyOn to mock the admin.storage method
+      const storageSpy = vi.spyOn(admin, 'storage').mockImplementation(() => {
         throw new Error('Firebase not initialized');
       });
 
@@ -174,8 +176,8 @@ describe('Storage Client', () => {
 
     // Test error handling for Firebase initialization issues
     it('should handle Firebase initialization issues', async () => {
-      // Use jest.spyOn to mock the admin.storage method
-      const storageSpy = jest.spyOn(admin, 'storage').mockImplementation(() => {
+      // Use vi.spyOn to mock the admin.storage method
+      const storageSpy = vi.spyOn(admin, 'storage').mockImplementation(() => {
         throw new Error('Firebase not initialized');
       });
 

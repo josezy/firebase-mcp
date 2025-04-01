@@ -1,6 +1,8 @@
 import { getDocument, updateDocument, deleteDocument, addDocument, listDocuments, list_collections } from '../firestoreClient';
 import { admin } from '../firebaseConfig';
 import { logger } from '../../../utils/logger';
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { vi } from 'vitest';
 
 /**
  * Firestore Client Tests
@@ -217,6 +219,25 @@ describe('Firestore Client', () => {
       expect(document.data).toBeDefined();
       expect(document.url).toBeDefined();
       expect(document.data.timestamp).toBe(testData.timestamp);
+    });
+
+    // Test error handling for Firebase initialization issues
+    it('should handle Firebase initialization issues', async () => {
+      // Use vi.spyOn to mock the admin.firestore method
+      const firestoreSpy = vi.spyOn(admin, 'firestore').mockImplementation(() => {
+        throw new Error('Firebase not initialized');
+      });
+
+      try {
+        const result = await listDocuments(testCollection, []);
+        
+        // Verify error response
+        expect(result.isError).toBe(true);
+        expect(result.content[0].text).toBe('Firebase not initialized');
+      } finally {
+        // Restore the original implementation
+        firestoreSpy.mockRestore();
+      }
     });
   });
 
