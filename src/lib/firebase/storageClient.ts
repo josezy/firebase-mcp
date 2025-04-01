@@ -9,7 +9,8 @@
  * @module firebase-mcp/storage
  */
 
-import { admin, getProjectId } from './firebaseConfig';
+import * as admin from 'firebase-admin';
+import { getProjectId } from './firebaseConfig';
 
 //const storage = admin.storage().bucket();
 
@@ -71,6 +72,34 @@ function getBucketName(projectId: string): string {
   return possibleBucketNames[0]; // Default to first format
 }
 
+async function getBucket() {
+  try {
+    const serviceAccountPath = process.env.SERVICE_ACCOUNT_KEY_PATH;
+    if (!serviceAccountPath) {
+      return null;
+    }
+
+    const projectId = getProjectId(serviceAccountPath);
+    if (!projectId) {
+      return null;
+    }
+
+    const storageBucket = process.env.FIREBASE_STORAGE_BUCKET;
+    if (storageBucket) {
+      return admin.storage().bucket(storageBucket);
+    }
+
+    const possibleBucketNames = [
+      `${projectId}.firebasestorage.app`,
+      `${projectId}.appspot.com`
+    ];
+
+    return admin.storage().bucket(possibleBucketNames[0]);
+  } catch (error) {
+    return null;
+  }
+}
+
 /**
  * Lists files and directories in a specified path in Firebase Storage.
  * Results are paginated and include download URLs for files and console URLs for directories.
@@ -92,138 +121,43 @@ function getBucketName(projectId: string): string {
  * // Get next page using the nextPageToken from the previous response
  * const nextPage = await listDirectoryFiles('images', 20, response.nextPageToken);
  */
-export async function listDirectoryFiles(path?: string, pageSize: number = 10, pageToken?: string): Promise<StorageResponse> {
+export async function listDirectoryFiles(
+  directoryPath: string = '',
+  pageSize: number = 10,
+  pageToken?: string
+): Promise<StorageResponse> {
   try {
-    // Check if Firebase is initialized
-    if (!admin) {
-      console.error('DEBUG: Firebase admin is not initialized');
-      return { 
-        content: [{ type: 'text', text: 'Firebase is not initialized. SERVICE_ACCOUNT_KEY_PATH environment variable is required.' }], 
-        isError: true 
+    const bucket = await getBucket();
+    if (!bucket) {
+      return {
+        content: [{ type: 'error', text: 'Storage bucket not available' }],
+        isError: true
       };
     }
-    
-    // Get the project ID for bucket name resolution and console URLs
-    const projectId = getProjectId();
-    console.error(`Project ID: ${projectId}`);
-    
-    // DEBUG: Check if we can access storage()
-    console.error(`DEBUG: Attempting to access admin.storage()`);
-    let adminStorage;
-    try {
-      adminStorage = admin.storage();
-      console.error(`DEBUG: Successfully accessed admin.storage()`);
-    } catch (error) {
-      console.error(`DEBUG: Failed to access admin.storage(): ${error instanceof Error ? error.message : 'Unknown error'}`);
-    }
 
-    // Try to get the default bucket first
-    let bucket;
-    try {
-      bucket = admin.storage().bucket();
-      console.error(`Default bucket name: ${bucket.name}`);
-    } catch (error) {
-      console.error(`Error getting default bucket: ${error instanceof Error ? error.message : 'Unknown error'}`);
-      
-      // If default bucket fails, try with explicit bucket name
-      const bucketName = getBucketName(projectId);
-      try {
-        bucket = admin.storage().bucket(bucketName);
-        console.error(`Using explicit bucket name: ${bucketName}`);
-      } catch (error) {
-        console.error(`Error getting bucket with name ${bucketName}: ${error instanceof Error ? error.message : 'Unknown error'}`);
-        return { 
-          content: [{ type: 'text', text: `Could not access storage bucket: ${error instanceof Error ? error.message : 'Unknown error'}` }], 
-          isError: true 
-        };
-      }
-    }
-    
-    // Normalize the path to ensure it ends with a slash if not empty
-    const prefix = path ? (path === '' ? '' : (path.endsWith('/') ? path : `${path}/`)) : '';
-    console.error(`Listing files with prefix: "${prefix}"`);
-    
-    // Get files with pagination
-    const [files, , apiResponse] = await bucket.getFiles({ 
-      prefix, 
-      delimiter: '/', // Use delimiter to simulate directory structure
+    const prefix = directoryPath ? `${directoryPath.replace(/\/*$/, '')}/` : '';
+    const [files, nextPageToken] = await bucket.getFiles({
+      prefix,
       maxResults: pageSize,
       pageToken
     });
-    
-    // Define the API response type for better type safety
-    interface ApiResponse {
-      nextPageToken?: string;
-      prefixes?: string[];
-    }
-    
-    const response = apiResponse as ApiResponse;
-    const nextPageToken = response.nextPageToken || undefined;
 
-    // Process files to get signed URLs for downloads
-    const fileNames = await Promise.all(files.map(async (file) => {
-      try {
-        const [signedUrl] = await file.getSignedUrl({
-          action: 'read',
-          expires: Date.now() + 1000 * 60 * 60 // 1 hour expiration
-        });
-        return { type: "file", name: file.name, downloadURL: signedUrl };
-      } catch (error) {
-        console.error(`Error getting signed URL for ${file.name}:`, error);
-        return { type: "file", name: file.name, downloadURL: null };
-      }
+    const fileList = files.map(file => ({
+      name: file.name,
+      size: file.metadata.size,
+      contentType: file.metadata.contentType,
+      updated: file.metadata.updated,
+      downloadUrl: file.metadata.mediaLink
     }));
 
-    // Process directories (prefixes) to get console URLs
-    const bucketName = bucket.name;
-    const directoryNames = (response.prefixes || []).map((prefix:string) => {    
-      const tmpPrefix = prefix.replace(/\/$/, '');
-      const encodedPrefix = `~2F${tmpPrefix.replace(/\//g, '~2F')}`;
-      const consoleUrl = `https://console.firebase.google.com/project/${projectId}/storage/${bucketName}/files/${encodedPrefix}`;
-      return { type: "directory", name: prefix, url: consoleUrl };
-    });
-
-    // Combine results and format for response
-    const result = { 
-      nextPageToken: nextPageToken, 
-      files: [...fileNames, ...directoryNames],
-      hasMore: nextPageToken !== undefined
-    };
-    
     return {
-      content: [
-        {
-          type: "text",
-          text: JSON.stringify(result, null, 2)
-        }
-      ]
+      content: [{ type: 'json', text: JSON.stringify({ files: fileList, nextPageToken }) }]
     };
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    console.error(`Error listing files: ${errorMessage}`);
-    
-    // Provide helpful guidance for bucket not found errors
-    if (errorMessage.includes('bucket does not exist')) {
-      return { 
-        content: [{ 
-          type: 'text', 
-          text: `The specified bucket does not exist. To use Firebase Storage functionality, you need to:
-1. Go to the Firebase Console (https://console.firebase.google.com)
-2. Select your project
-3. Navigate to the Storage section
-4. Complete the initial setup to create a storage bucket
-5. Set the appropriate security rules
-
-Once a storage bucket exists for your project, the storage_list_files function will work properly.`
-        }], 
-        isError: true 
-      };
-    }
-    
-    // Return generic error for other cases
-    return { 
-      content: [{ type: 'text', text: `Error listing files: ${errorMessage}` }], 
-      isError: true 
+    return {
+      content: [{ type: 'error', text: `Error listing files: ${errorMessage}` }],
+      isError: true
     };
   }
 }
@@ -242,102 +176,46 @@ Once a storage bucket exists for your project, the storage_list_files function w
  */
 export async function getFileInfo(filePath: string): Promise<StorageResponse> {
   try {
-    // Check if Firebase is initialized
-    if (!admin) {
-      return { 
-        content: [{ type: 'text', text: 'Firebase is not initialized. SERVICE_ACCOUNT_KEY_PATH environment variable is required.' }], 
-        isError: true 
+    const bucket = await getBucket();
+    if (!bucket) {
+      return {
+        content: [{ type: 'error', text: 'Storage bucket not available' }],
+        isError: true
       };
     }
-    
-    // Get the project ID for bucket name resolution
-    const projectId = getProjectId();
-    
-    // Try to get the default bucket first
-    let bucket;
-    try {
-      bucket = admin.storage().bucket();
-      console.error(`Default bucket name: ${bucket.name}`);
-    } catch (error) {
-      console.error(`Error getting default bucket: ${error instanceof Error ? error.message : 'Unknown error'}`);
-      
-      // If default bucket fails, try with explicit bucket name
-      const bucketName = getBucketName(projectId);
-      try {
-        bucket = admin.storage().bucket(bucketName);
-        console.error(`Using explicit bucket name: ${bucketName}`);
-      } catch (error) {
-        console.error(`Error getting bucket with name ${bucketName}: ${error instanceof Error ? error.message : 'Unknown error'}`);
-        return { 
-          content: [{ type: 'text', text: `Could not access storage bucket: ${error instanceof Error ? error.message : 'Unknown error'}` }], 
-          isError: true 
-        };
-      }
-    }
-    
-    // Get reference to the file
+
     const file = bucket.file(filePath);
-    
-    // Check if file exists before attempting to get metadata
     const [exists] = await file.exists();
+
     if (!exists) {
-      // For test compatibility, throw the error in test environment
-      if (process.env.NODE_ENV === 'test' || process.env.USE_FIREBASE_EMULATOR) {
-        throw new Error(`No such object: ${filePath}`);
-      }
-      
-      // In production, return a structured error response
-      return { 
-        content: [{ type: 'text', text: `File not found: ${filePath}` }], 
-        isError: true 
+      return {
+        content: [{ type: 'error', text: `File not found: ${filePath}` }],
+        isError: true
       };
     }
-    
-    // Get file metadata and signed URL for download
+
     const [metadata] = await file.getMetadata();
     const [url] = await file.getSignedUrl({
       action: 'read',
-      expires: Date.now() + 1000 * 60 * 60 // 1 hour expiration
+      expires: Date.now() + 15 * 60 * 1000 // URL expires in 15 minutes
     });
-    
-    // Format the response with metadata and download URL
-    const result = { metadata, downloadUrl: url };
+
+    const fileInfo = {
+      name: metadata.name,
+      size: metadata.size,
+      contentType: metadata.contentType,
+      updated: metadata.updated,
+      downloadUrl: url
+    };
+
     return {
-      content: [
-        { type: 'text', text: JSON.stringify(result, null, 2) }
-      ]
+      content: [{ type: 'json', text: JSON.stringify(fileInfo) }]
     };
   } catch (error) {
-    // Re-throw the error in test environment for test compatibility
-    if (process.env.NODE_ENV === 'test' || process.env.USE_FIREBASE_EMULATOR) {
-      throw error;
-    }
-    
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    console.error(`Error getting file info: ${errorMessage}`);
-    
-    // Provide helpful guidance for bucket not found errors
-    if (errorMessage.includes('bucket does not exist')) {
-      return { 
-        content: [{ 
-          type: 'text', 
-          text: `The specified bucket does not exist. To use Firebase Storage functionality, you need to:
-1. Go to the Firebase Console (https://console.firebase.google.com)
-2. Select your project
-3. Navigate to the Storage section
-4. Complete the initial setup to create a storage bucket
-5. Set the appropriate security rules
-
-Once a storage bucket exists for your project, the storage_get_file_info function will work properly.`
-        }], 
-        isError: true 
-      };
-    }
-    
-    // Return generic error for other cases
-    return { 
-      content: [{ type: 'text', text: `Error getting file info: ${errorMessage}` }], 
-      isError: true 
+    return {
+      content: [{ type: 'error', text: `Error getting file info: ${errorMessage}` }],
+      isError: true
     };
   }
 }

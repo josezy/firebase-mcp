@@ -12,6 +12,12 @@ import { Query, Timestamp } from 'firebase-admin/firestore';
 import {db, getProjectId} from './firebaseConfig';
 import fs from 'fs';
 import path from 'path';
+import * as admin from 'firebase-admin';
+
+interface FirestoreResponse {
+  content: Array<{ type: string, text: string }>;
+  isError?: boolean;
+}
 
 /**
  * Lists collections in Firestore, either at the root level or under a specific document.
@@ -31,53 +37,46 @@ import path from 'path';
  * // List subcollections of a document
  * const subCollections = await list_collections('users/user123');
  */
-export async function list_collections(documentPath?: string, limit: number = 20, pageToken?: string) {
+export async function list_collections(documentPath?: string, limit: number = 20, pageToken?: string): Promise<FirestoreResponse> {
   try {
-    // Check if Firebase is initialized
-    if (!db) {
-      return { content: [{ type: 'text', text: 'Firebase is not initialized. SERVICE_ACCOUNT_KEY_PATH environment variable is required.' }], isError: true };
+    const collections = documentPath
+      ? await admin.firestore().doc(documentPath).listCollections()
+      : await admin.firestore().listCollections();
+
+    const serviceAccountPath = process.env.SERVICE_ACCOUNT_KEY_PATH;
+    if (!serviceAccountPath) {
+      return {
+        content: [{ type: 'error', text: 'Service account path not set' }],
+        isError: true
+      };
     }
-    
-    let collections;
-    if (documentPath) {
-      // Get subcollections of a specific document
-      const docRef = db.doc(documentPath);
-      collections = await docRef.listCollections();
-    } else {
-      // Get root collections
-      collections = await db.listCollections();
+
+    const projectId = getProjectId(serviceAccountPath);
+    if (!projectId) {
+      return {
+        content: [{ type: 'error', text: 'Could not determine project ID' }],
+        isError: true
+      };
     }
-    
-    // Sort collections by name for consistent ordering
-    collections.sort((a, b) => a.id.localeCompare(b.id));
-    
-    // Find start index for pagination
-    const startIndex = pageToken ? collections.findIndex(c => c.id === pageToken) + 1 : 0;
-    
-    // Apply limit for pagination
-    const paginatedCollections = collections.slice(startIndex, startIndex + limit);
-    
-    // Get project ID for console URLs
-    const projectId = getProjectId();
-    const collectionData = paginatedCollections.map((collection) => {
+
+    const collectionList = collections.map(collection => {
       const collectionUrl = `https://console.firebase.google.com/project/${projectId}/firestore/data/${documentPath}/${collection.id}`;
-      return { name: collection.id, url: collectionUrl };
+      return {
+        id: collection.id,
+        path: collection.path,
+        url: collectionUrl
+      };
     });
-    
-    // Format response for MCP
-    return { 
-      content: [{
-        type: 'text', 
-        text: JSON.stringify({
-          collections: collectionData,
-          nextPageToken: collections.length > startIndex + limit ? 
-            paginatedCollections[paginatedCollections.length - 1].id : null,
-          hasMore: collections.length > startIndex + limit
-        })
-      }]
+
+    return {
+      content: [{ type: 'json', text: JSON.stringify({ collections: collectionList }) }]
     };
   } catch (error) {
-    return { content: [{ type: 'text', text: `Error listing collections: ${(error as Error).message}` }], isError: true };
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    return {
+      content: [{ type: 'error', text: errorMessage }],
+      isError: true
+    };
   }
 }
 
@@ -120,69 +119,70 @@ function convertTimestampsToISO(data: any) {
  *   { field: 'status', operator: '==', value: 'active' }
  * ]);
  */
-export async function listDocuments(collection: string, filters: Array<{ field: string, operator: FirebaseFirestore.WhereFilterOp, value: any }> = [], limit: number = 20, pageToken?: string) {
-  const projectId = getProjectId();
+export async function listDocuments(
+  collection: string,
+  filters?: Array<{ field: string, operator: FirebaseFirestore.WhereFilterOp, value: any }>,
+  limit: number = 20,
+  pageToken?: string
+): Promise<FirestoreResponse> {
   try {
-    // Check if Firebase is initialized
-    if (!db) {
-      return { content: [{ type: 'text', text: 'Firebase is not initialized. SERVICE_ACCOUNT_KEY_PATH environment variable is required.' }], isError: true };
+    let query: FirebaseFirestore.Query = admin.firestore().collection(collection);
+
+    if (filters) {
+      filters.forEach(filter => {
+        query = query.where(filter.field, filter.operator, filter.value);
+      });
     }
-    
-    // Get reference to the collection
-    const collectionRef = db.collection(collection);
-    let filteredQuery: Query = collectionRef;
-    
-    // Apply filters
-    for (const filter of filters) {
-      let filterValue = filter.value;
-      // Convert string dates to Firestore Timestamps
-      if (typeof filterValue === 'string' && !isNaN(Date.parse(filterValue))) {
-        filterValue = Timestamp.fromDate(new Date(filterValue));
-      }
-      filteredQuery = filteredQuery.where(filter.field, filter.operator, filterValue);
+
+    if (limit) {
+      query = query.limit(limit);
     }
-    
-    // Apply pagination if a page token is provided
+
     if (pageToken) {
-      const startAfterDoc = await collectionRef.doc(pageToken).get();
-      filteredQuery = filteredQuery.startAfter(startAfterDoc);
+      const lastDoc = await admin.firestore().doc(pageToken).get();
+      if (lastDoc.exists) {
+        query = query.startAfter(lastDoc);
+      }
     }
 
-    // Get total count of documents matching the filter
-    const countSnapshot = await filteredQuery.get();
-    const totalCount = countSnapshot.size;
-
-    // Get the documents with limit applied
-    const limitedQuery = filteredQuery.limit(limit);
-    const snapshot = await limitedQuery.get();
-
-    // Handle empty results
-    if (snapshot.empty) {
-      return { content: [{ type: 'text', text: 'No matching documents found' }], isError: true };
+    const snapshot = await query.get();
+    const serviceAccountPath = process.env.SERVICE_ACCOUNT_KEY_PATH;
+    if (!serviceAccountPath) {
+      return {
+        content: [{ type: 'error', text: 'Service account path not set' }],
+        isError: true
+      };
     }
-    
-    // Process document data
-    const documents = snapshot.docs.map((doc: any) => {
-      const data = doc.data();
-      convertTimestampsToISO(data);
+
+    const projectId = getProjectId(serviceAccountPath);
+    if (!projectId) {
+      return {
+        content: [{ type: 'error', text: 'Could not determine project ID' }],
+        isError: true
+      };
+    }
+
+    const documents = snapshot.docs.map(doc => {
       const consoleUrl = `https://console.firebase.google.com/project/${projectId}/firestore/data/${collection}/${doc.id}`;
-      return { id: doc.id, url: consoleUrl, document: data };
+      return {
+        id: doc.id,
+        data: doc.data(),
+        url: consoleUrl
+      };
     });
-    
-    // Format response for MCP
-    return { 
-      content: [{
-        type: 'text', 
-        text: JSON.stringify({
-          totalCount,
-          documents,
-          pageToken: documents.length > 0 ? documents[documents.length - 1].id : null,
-          hasMore: totalCount > limit
-        })
-      }]
+
+    const lastVisible = snapshot.docs[snapshot.docs.length - 1];
+    const nextPageToken = lastVisible ? lastVisible.ref.path : undefined;
+
+    return {
+      content: [{ type: 'json', text: JSON.stringify({ documents, nextPageToken }) }]
     };
   } catch (error) {
-    return { content: [{ type: 'text', text: `Error listing documents: ${(error as Error).message}` }], isError: true };
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    return {
+      content: [{ type: 'error', text: errorMessage }],
+      isError: true
+    };
   }
 }
 
@@ -202,27 +202,36 @@ export async function listDocuments(collection: string, filters: Array<{ field: 
  *   createdAt: new Date()
  * });
  */
-export async function addDocument(collection: string, data: any) {
+export async function addDocument(collection: string, data: object): Promise<FirestoreResponse> {
   try {
-    // Check if Firebase is initialized
-    if (!db) {
-      return { content: [{ type: 'text', text: 'Firebase is not initialized. SERVICE_ACCOUNT_KEY_PATH environment variable is required.' }], isError: true };
+    const docRef = await admin.firestore().collection(collection).add(data);
+    const serviceAccountPath = process.env.SERVICE_ACCOUNT_KEY_PATH;
+    if (!serviceAccountPath) {
+      return {
+        content: [{ type: 'error', text: 'Service account path not set' }],
+        isError: true
+      };
     }
-    
-    // Add the document and get its reference
-    const docRef = await db.collection(collection).add(data);
-    const projectId = getProjectId();
-    
-    // Convert timestamps for JSON serialization
-    convertTimestampsToISO(data);
-    
-    // Generate console URL for the new document
+
+    const projectId = getProjectId(serviceAccountPath);
+    if (!projectId) {
+      return {
+        content: [{ type: 'error', text: 'Could not determine project ID' }],
+        isError: true
+      };
+    }
+
     const consoleUrl = `https://console.firebase.google.com/project/${projectId}/firestore/data/${collection}/${docRef.id}`;
-    
-    // Format response for MCP
-    return { content: [{ type: 'text', text: JSON.stringify({ id: docRef.id, url: consoleUrl, document: data }) }] };
+
+    return {
+      content: [{ type: 'json', text: JSON.stringify({ id: docRef.id, url: consoleUrl }) }]
+    };
   } catch (error) {
-    return { content: [{ type: 'text', text: `Error adding document: ${(error as Error).message}` }], isError: true };
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    return {
+      content: [{ type: 'error', text: errorMessage }],
+      isError: true
+    };
   }
 }
 
@@ -238,35 +247,43 @@ export async function addDocument(collection: string, data: any) {
  * // Get a specific user document
  * const user = await getDocument('users', 'user123');
  */
-export async function getDocument(collection: string, id: string) {
+export async function getDocument(collection: string, id: string): Promise<FirestoreResponse> {
   try {
-    // Check if Firebase is initialized
-    if (!db) {
-      return { content: [{ type: 'text', text: 'Firebase is not initialized. SERVICE_ACCOUNT_KEY_PATH environment variable is required.' }], isError: true };
+    const doc = await admin.firestore().collection(collection).doc(id).get();
+    const serviceAccountPath = process.env.SERVICE_ACCOUNT_KEY_PATH;
+    if (!serviceAccountPath) {
+      return {
+        content: [{ type: 'error', text: 'Service account path not set' }],
+        isError: true
+      };
     }
-    
-    // Get the document
-    const doc = await db.collection(collection).doc(id).get();
-    
-    // Handle document not found
+
+    const projectId = getProjectId(serviceAccountPath);
+    if (!projectId) {
+      return {
+        content: [{ type: 'error', text: 'Could not determine project ID' }],
+        isError: true
+      };
+    }
+
     if (!doc.exists) {
-      return { content: [{ type: 'text', text: 'Document not found' }], isError: true };
+      return {
+        content: [{ type: 'error', text: `Document not found: ${id}` }],
+        isError: true
+      };
     }
-    
-    // Get project ID for console URL
-    const projectId = getProjectId();
-    const data = doc.data();
-    
-    // Convert timestamps for JSON serialization
-    convertTimestampsToISO(data);
-    
-    // Generate console URL for the document
+
     const consoleUrl = `https://console.firebase.google.com/project/${projectId}/firestore/data/${collection}/${id}`;
-    
-    // Format response for MCP
-    return { content: [{ type: 'text', text: JSON.stringify({ id, url: consoleUrl, document: data }) }] };
+
+    return {
+      content: [{ type: 'json', text: JSON.stringify({ id: doc.id, data: doc.data(), url: consoleUrl }) }]
+    };
   } catch (error) {
-    return { content: [{ type: 'text', text: `Error getting document: ${(error as Error).message}` }], isError: true };
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    return {
+      content: [{ type: 'error', text: errorMessage }],
+      isError: true
+    };
   }
 }
 
@@ -286,29 +303,36 @@ export async function getDocument(collection: string, id: string) {
  *   lastUpdated: new Date()
  * });
  */
-export async function updateDocument(collection: string, id: string, data: any) {
+export async function updateDocument(collection: string, id: string, data: object): Promise<FirestoreResponse> {
   try {
-    // Check if Firebase is initialized
-    if (!db) {
-      return { content: [{ type: 'text', text: 'Firebase is not initialized. SERVICE_ACCOUNT_KEY_PATH environment variable is required.' }], isError: true };
+    await admin.firestore().collection(collection).doc(id).update(data);
+    const serviceAccountPath = process.env.SERVICE_ACCOUNT_KEY_PATH;
+    if (!serviceAccountPath) {
+      return {
+        content: [{ type: 'error', text: 'Service account path not set' }],
+        isError: true
+      };
     }
-    
-    // Update the document
-    await db.collection(collection).doc(id).update(data);
-    
-    // Get project ID for console URL
-    const projectId = getProjectId();
-    
-    // Convert timestamps for JSON serialization
-    convertTimestampsToISO(data);
-    
-    // Generate console URL for the document
+
+    const projectId = getProjectId(serviceAccountPath);
+    if (!projectId) {
+      return {
+        content: [{ type: 'error', text: 'Could not determine project ID' }],
+        isError: true
+      };
+    }
+
     const consoleUrl = `https://console.firebase.google.com/project/${projectId}/firestore/data/${collection}/${id}`;
-    
-    // Format response for MCP
-    return { content: [{ type: 'text', text: JSON.stringify({ id, url: consoleUrl, document: data }) }] };
+
+    return {
+      content: [{ type: 'json', text: JSON.stringify({ success: true, url: consoleUrl }) }]
+    };
   } catch (error) {
-    return { content: [{ type: 'text', text: `Error updating document: ${(error as Error).message}` }], isError: true };
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    return {
+      content: [{ type: 'error', text: errorMessage }],
+      isError: true
+    };
   }
 }
 
@@ -324,19 +348,17 @@ export async function updateDocument(collection: string, id: string, data: any) 
  * // Delete a user document
  * const result = await deleteDocument('users', 'user123');
  */
-export async function deleteDocument(collection: string, id: string) {
+export async function deleteDocument(collection: string, id: string): Promise<FirestoreResponse> {
   try {
-    // Check if Firebase is initialized
-    if (!db) {
-      return { content: [{ type: 'text', text: 'Firebase is not initialized. SERVICE_ACCOUNT_KEY_PATH environment variable is required.' }], isError: true };
-    }
-    
-    // Delete the document
-    await db.collection(collection).doc(id).delete();
-    
-    // Format response for MCP
-    return { content: [{ type: 'text', text: 'Document deleted successfully' }] };
+    await admin.firestore().collection(collection).doc(id).delete();
+    return {
+      content: [{ type: 'json', text: JSON.stringify({ success: true }) }]
+    };
   } catch (error) {
-    return { content: [{ type: 'text', text: `Error deleting document: ${(error as Error).message}` }], isError: true };
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    return {
+      content: [{ type: 'error', text: errorMessage }],
+      isError: true
+    };
   }
 }

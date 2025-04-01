@@ -52,7 +52,6 @@ function initializeFirebase(): admin.app.App | null {
     
     // Validate service account path is provided
     if (!serviceAccountPath) {
-      console.error('Firebase initialization skipped: SERVICE_ACCOUNT_KEY_PATH is not set');
       return null;
     }
 
@@ -63,13 +62,11 @@ function initializeFirebase(): admin.app.App | null {
 
       // Validate project ID was found in the service account
       if (!projectId) {
-        console.error('Firebase initialization failed: Could not determine project ID');
         return null;
       }
 
       // Get bucket name from environment variable or use default format
       const storageBucket = process.env.FIREBASE_STORAGE_BUCKET || `${projectId}.firebasestorage.app`;
-      console.error(`Initializing Firebase with bucket name: ${storageBucket}`);
 
       // Initialize Firebase Admin SDK with the service account and storage configuration
       return admin.initializeApp({
@@ -77,13 +74,9 @@ function initializeFirebase(): admin.app.App | null {
         storageBucket: storageBucket
       });
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      console.error(`Firebase initialization failed: ${errorMessage}`);
       return null;
     }
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    console.error(`Firebase initialization failed: ${errorMessage}`);
     return null;
   }
 }
@@ -104,24 +97,18 @@ function initializeFirebase(): admin.app.App | null {
  * // Get project ID from a specific service account file
  * const projectId = getProjectId('/path/to/service-account.json');
  */
-function getProjectId(serviceAccountPath?: string): string {
+function getProjectId(serviceAccountPath: string): string | null {
   // Use provided path or fall back to environment variable
   if (!serviceAccountPath) {
-    serviceAccountPath = process.env.SERVICE_ACCOUNT_KEY_PATH;
-    if (!serviceAccountPath) {
-      console.error('Cannot get project ID: SERVICE_ACCOUNT_KEY_PATH is not set');
-      return '';
-    }
+    return null;
   }
   
   try {
     // Read and parse the service account file
     const serviceAccount = JSON.parse(fs.readFileSync(serviceAccountPath, 'utf8'));
-    return serviceAccount.project_id || '';
+    return serviceAccount.project_id || null;
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    console.error(`Failed to get project ID: ${errorMessage}`);
-    return '';
+    return null;
   }
 }
 
