@@ -112,7 +112,7 @@ class FirebaseMcpServer {
         },
         {
           name: 'firestore_list_documents',
-          description: 'List documents from a Firestore collection',
+          description: 'List documents from a Firestore collection with optional filtering',
           inputSchema: {
             type: 'object',
             properties: {
@@ -124,6 +124,24 @@ class FirebaseMcpServer {
                 type: 'number',
                 description: 'Maximum number of documents to return',
                 default: 10
+              },
+              where: {
+                type: 'object',
+                description: 'Optional filter condition',
+                properties: {
+                  field: {
+                    type: 'string',
+                    description: 'Field name to filter on'
+                  },
+                  operator: {
+                    type: 'string',
+                    description: 'Comparison operator (==, >, <, >=, <=)'
+                  },
+                  value: {
+                    description: 'Value to compare against'
+                  }
+                },
+                required: ['field', 'operator', 'value']
               }
             },
             required: ['collection']
@@ -176,10 +194,18 @@ class FirebaseMcpServer {
             const collection = args.collection as string;
             const limit = Math.min(Math.max(1, (args.limit as number) || 10), 100); // Limit between 1 and 100
             
-            const snapshot = await admin.firestore()
-              .collection(collection)
-              .limit(limit)
-              .get();
+            let query: admin.firestore.Query = admin.firestore().collection(collection);
+
+            // Apply where filter if provided
+            const where = args.where as { field: string; operator: admin.firestore.WhereFilterOp; value: any } | undefined;
+            if (where) {
+              query = query.where(where.field, where.operator, where.value);
+            }
+            
+            // Apply limit
+            query = query.limit(limit);
+            
+            const snapshot = await query.get();
             
             const documents = snapshot.docs.map(doc => {
               const rawData = doc.data();
