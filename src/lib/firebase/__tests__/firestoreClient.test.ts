@@ -114,6 +114,27 @@ describe('Firestore Client', () => {
         process.env.SERVICE_ACCOUNT_KEY_PATH = originalPath;
       }
     });
+
+    // Test error handling when SERVICE_ACCOUNT_KEY_PATH is not set
+    it('should handle missing service account path for getDocument', async () => {
+      // Save the original service account path
+      const originalPath = process.env.SERVICE_ACCOUNT_KEY_PATH;
+      
+      try {
+        // Clear the service account path
+        delete process.env.SERVICE_ACCOUNT_KEY_PATH;
+        
+        // Call the function
+        const result = await getDocument(testCollection, testDocId);
+        
+        // Verify error response
+        expect(result.isError).toBe(true);
+        expect(result.content[0].text).toBe('Service account path not set');
+      } finally {
+        // Restore the original service account path
+        process.env.SERVICE_ACCOUNT_KEY_PATH = originalPath;
+      }
+    });
   });
 
   describe('addDocument', () => {
@@ -140,6 +161,33 @@ describe('Firestore Client', () => {
       // Clean up the added document
       if (responseData.id) {
         await admin.firestore().collection(testCollection).doc(responseData.id).delete();
+      }
+    });
+
+    // Test error handling when SERVICE_ACCOUNT_KEY_PATH is not set
+    it('should handle missing service account path for addDocument', async () => {
+      // Save the original service account path
+      const originalPath = process.env.SERVICE_ACCOUNT_KEY_PATH;
+      
+      try {
+        // Clear the service account path
+        delete process.env.SERVICE_ACCOUNT_KEY_PATH;
+        
+        // Data for new document
+        const newDocData = {
+          name: 'Test Doc',
+          timestamp: new Date().toISOString()
+        };
+        
+        // Call the function
+        const result = await addDocument(testCollection, newDocData);
+        
+        // Verify error response
+        expect(result.isError).toBe(true);
+        expect(result.content[0].text).toBe('Service account path not set');
+      } finally {
+        // Restore the original service account path
+        process.env.SERVICE_ACCOUNT_KEY_PATH = originalPath;
       }
     });
   });
