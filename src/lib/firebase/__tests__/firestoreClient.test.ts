@@ -303,6 +303,30 @@ describe('Firestore Client', () => {
       expect(result.content[0].text).toBe('no entity to delete');
       expect(result.isError).toBe(true);
     });
+
+    // Test for handling Firebase errors
+    it('should handle Firebase errors in deleteDocument', async () => {
+      // Mock Firestore to throw an error
+      const mockError = new Error('Firebase error during delete');
+      
+      const mockDoc = {
+        get: vi.fn().mockRejectedValue(mockError),
+        delete: vi.fn()
+      };
+      
+      const mockCollection = {
+        doc: vi.fn().mockReturnValue(mockDoc)
+      };
+      
+      // Mock the collection method
+      vi.spyOn(admin.firestore(), 'collection').mockReturnValue(mockCollection as any);
+      
+      const result = await deleteDocument('tests', 'error-doc');
+      
+      // Verify error response
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toBe(mockError.message);
+    });
   });
 
   describe('listDocuments', () => {
@@ -350,6 +374,51 @@ describe('Firestore Client', () => {
       } finally {
         // Restore the original implementation
         firestoreSpy.mockRestore();
+      }
+    });
+
+    // Test error handling when SERVICE_ACCOUNT_KEY_PATH is not set
+    it('should handle missing service account path for listDocuments', async () => {
+      // Save the original service account path
+      const originalPath = process.env.SERVICE_ACCOUNT_KEY_PATH;
+      
+      try {
+        // Clear the service account path
+        delete process.env.SERVICE_ACCOUNT_KEY_PATH;
+        
+        // Call the function
+        const result = await listDocuments(testCollection);
+        
+        // Verify error response
+        expect(result.isError).toBe(true);
+        expect(result.content[0].text).toBe('Service account path not set');
+      } finally {
+        // Restore the original service account path
+        process.env.SERVICE_ACCOUNT_KEY_PATH = originalPath;
+      }
+    });
+
+    // Test error handling when getProjectId returns null
+    it('should handle null project ID gracefully for listDocuments', async () => {
+      // Save service account path to restore later
+      const originalPath = process.env.SERVICE_ACCOUNT_KEY_PATH;
+      
+      try {
+        // Mock getProjectId to return null for this test only
+        vi.spyOn(firebaseConfig, 'getProjectId').mockReturnValue(null);
+        
+        // Set service account path to ensure code path is executed
+        process.env.SERVICE_ACCOUNT_KEY_PATH = '/path/to/service-account.json';
+        
+        // Call the function
+        const result = await listDocuments(testCollection);
+        
+        // Verify error response
+        expect(result.isError).toBe(true);
+        expect(result.content[0].text).toBe('Could not determine project ID');
+      } finally {
+        // Restore service account path
+        process.env.SERVICE_ACCOUNT_KEY_PATH = originalPath;
       }
     });
   });
