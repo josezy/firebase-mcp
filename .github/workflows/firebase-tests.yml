@@ -5,9 +5,9 @@ name: Firebase Tests CI
 
 on:
   push:
-    branches: [ "main", "CI-Workflow" ]
+    branches: [ "**" ]  # Trigger on all branches
   pull_request:
-    branches: [ "main" ]
+    branches: [ "**" ]  # Trigger on all PRs
 
 jobs:
   test:

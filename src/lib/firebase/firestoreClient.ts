@@ -350,7 +350,17 @@ export async function updateDocument(collection: string, id: string, data: objec
  */
 export async function deleteDocument(collection: string, id: string): Promise<FirestoreResponse> {
   try {
-    await admin.firestore().collection(collection).doc(id).delete();
+    const docRef = admin.firestore().collection(collection).doc(id);
+    const doc = await docRef.get();
+    
+    if (!doc.exists) {
+      return {
+        content: [{ type: 'error', text: 'no entity to delete' }],
+        isError: true
+      };
+    }
+
+    await docRef.delete();
     return {
       content: [{ type: 'json', text: JSON.stringify({ success: true }) }]
     };

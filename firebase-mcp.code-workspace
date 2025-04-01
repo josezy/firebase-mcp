@@ -2,9 +2,6 @@
 	"folders": [
 		{
 			"path": "."
-		},
-		{
-			"path": "../../../Library/Application Support/Cursor/logs"
 		}
 	],
 	"settings": {}

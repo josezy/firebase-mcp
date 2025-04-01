@@ -14,30 +14,38 @@ import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { CallToolRequestSchema, ListToolsRequestSchema, ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 import * as admin from 'firebase-admin';
+import { logger } from './utils/logger.js';
 
 // Initialize Firebase
 function initializeFirebase() {
   try {
     const serviceAccountPath = process.env.SERVICE_ACCOUNT_KEY_PATH;
     if (!serviceAccountPath) {
+      logger.error('SERVICE_ACCOUNT_KEY_PATH not set');
       return null;
     }
 
     try {
       const existingApp = admin.app();
       if (existingApp) {
+        logger.debug('Using existing Firebase app');
         return existingApp;
       }
     } catch (error) {
       // No existing app, continue with initialization
+      logger.debug('No existing Firebase app, initializing new one');
     }
 
     const serviceAccount = require(serviceAccountPath);
+    const storageBucket = process.env.FIREBASE_STORAGE_BUCKET;
+    logger.debug(`Initializing Firebase with storage bucket: ${storageBucket}`);
+
     return admin.initializeApp({
       credential: admin.credential.cert(serviceAccount),
-      storageBucket: process.env.FIREBASE_STORAGE_BUCKET
+      storageBucket: storageBucket
     });
   } catch (error) {
+    logger.error('Failed to initialize Firebase', error);
     return null;
   }
 }
@@ -551,11 +559,16 @@ class FirebaseMcpServer {
             const directoryPath = (args.directoryPath as string) || '';
             
             try {
+              logger.debug(`Listing files in directory: ${directoryPath}`);
               const bucket = admin.storage().bucket();
+              logger.debug(`Got bucket reference: ${bucket.name}`);
+
               const [files] = await bucket.getFiles({
                 prefix: directoryPath,
                 delimiter: '/'
               });
+
+              logger.debug(`Found ${files.length} files`);
 
               const fileList = files.map(file => ({
                 name: file.name,
@@ -572,6 +585,7 @@ class FirebaseMcpServer {
                 }]
               };
             } catch (error) {
+              logger.error('Failed to list files', error);
               return {
                 content: [{
                   type: 'text',
@@ -588,11 +602,15 @@ class FirebaseMcpServer {
             const filePath = args.filePath as string;
             
             try {
+              logger.debug(`Getting info for file: ${filePath}`);
               const bucket = admin.storage().bucket();
-              const file = bucket.file(filePath);
+              logger.debug(`Got bucket reference: ${bucket.name}`);
               
+              const file = bucket.file(filePath);
               const [exists] = await file.exists();
+              
               if (!exists) {
+                logger.warn(`File not found: ${filePath}`);
                 return {
                   content: [{
                     type: 'text',
@@ -603,6 +621,7 @@ class FirebaseMcpServer {
                 };
               }
 
+              logger.debug('File exists, getting metadata and signed URL');
               const [metadata] = await file.getMetadata();
               const [url] = await file.getSignedUrl({
                 action: 'read',
@@ -626,6 +645,7 @@ class FirebaseMcpServer {
                 }]
               };
             } catch (error) {
+              logger.error('Failed to get file info', error);
               return {
                 content: [{
                   type: 'text',
