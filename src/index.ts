@@ -112,7 +112,7 @@ class FirebaseMcpServer {
         },
         {
           name: 'firestore_list_documents',
-          description: 'List documents from a Firestore collection with optional filtering',
+          description: 'List documents from a Firestore collection with filtering and ordering',
           inputSchema: {
             type: 'object',
             properties: {
@@ -120,28 +120,55 @@ class FirebaseMcpServer {
                 type: 'string',
                 description: 'Collection name'
               },
+              filters: {
+                type: 'array',
+                description: 'Array of filter conditions',
+                items: {
+                  type: 'object',
+                  properties: {
+                    field: {
+                      type: 'string',
+                      description: 'Field name to filter'
+                    },
+                    operator: {
+                      type: 'string',
+                      description: 'Comparison operator (==, >, <, >=, <=, array-contains, in, array-contains-any)'
+                    },
+                    value: {
+                      description: 'Value to compare against (use ISO format for dates)'
+                    }
+                  },
+                  required: ['field', 'operator', 'value']
+                }
+              },
               limit: {
                 type: 'number',
-                description: 'Maximum number of documents to return',
-                default: 10
+                description: 'Number of documents to return',
+                default: 20
               },
-              where: {
-                type: 'object',
-                description: 'Optional filter condition',
-                properties: {
-                  field: {
-                    type: 'string',
-                    description: 'Field name to filter on'
+              pageToken: {
+                type: 'string',
+                description: 'Token for pagination to get the next page of results'
+              },
+              orderBy: {
+                type: 'array',
+                description: 'Array of fields to order by',
+                items: {
+                  type: 'object',
+                  properties: {
+                    field: {
+                      type: 'string',
+                      description: 'Field name to order by'
+                    },
+                    direction: {
+                      type: 'string',
+                      description: 'Sort direction (asc or desc)',
+                      enum: ['asc', 'desc'],
+                      default: 'asc'
+                    }
                   },
-                  operator: {
-                    type: 'string',
-                    description: 'Comparison operator (==, >, <, >=, <=)'
-                  },
-                  value: {
-                    description: 'Value to compare against'
-                  }
-                },
-                required: ['field', 'operator', 'value']
+                  required: ['field']
+                }
               }
             },
             required: ['collection']
@@ -192,21 +219,48 @@ class FirebaseMcpServer {
 
           case 'firestore_list_documents': {
             const collection = args.collection as string;
-            const limit = Math.min(Math.max(1, (args.limit as number) || 10), 100); // Limit between 1 and 100
+            const limit = Math.min(Math.max(1, (args.limit as number) || 20), 100); // Default 20, max 100
             
             let query: admin.firestore.Query = admin.firestore().collection(collection);
 
-            // Apply where filter if provided
-            const where = args.where as { field: string; operator: admin.firestore.WhereFilterOp; value: any } | undefined;
-            if (where) {
-              query = query.where(where.field, where.operator, where.value);
+            // Apply filters if provided
+            const filters = args.filters as Array<{
+              field: string;
+              operator: admin.firestore.WhereFilterOp;
+              value: any;
+            }> | undefined;
+
+            if (filters && filters.length > 0) {
+              filters.forEach(filter => {
+                query = query.where(filter.field, filter.operator, filter.value);
+              });
+            }
+
+            // Apply ordering if provided
+            const orderBy = args.orderBy as Array<{
+              field: string;
+              direction?: 'asc' | 'desc';
+            }> | undefined;
+
+            if (orderBy && orderBy.length > 0) {
+              orderBy.forEach(order => {
+                query = query.orderBy(order.field, order.direction || 'asc');
+              });
+            }
+
+            // Apply pagination if pageToken is provided
+            const pageToken = args.pageToken as string | undefined;
+            if (pageToken) {
+              const lastDoc = await admin.firestore().doc(pageToken).get();
+              if (lastDoc.exists) {
+                query = query.startAfter(lastDoc);
+              }
             }
             
             // Apply limit
             query = query.limit(limit);
             
             const snapshot = await query.get();
-            
             const documents = snapshot.docs.map(doc => {
               const rawData = doc.data();
               // Sanitize data to ensure it's JSON-serializable
@@ -240,11 +294,18 @@ class FirebaseMcpServer {
                 data
               };
             });
+
+            // Get the last document for pagination
+            const lastVisible = snapshot.docs[snapshot.docs.length - 1];
+            const nextPageToken = lastVisible ? lastVisible.ref.path : null;
             
             return {
               content: [{
                 type: 'text',
-                text: JSON.stringify({ documents })
+                text: JSON.stringify({
+                  documents,
+                  nextPageToken
+                })
               }]
             };
           }
@@ -268,6 +329,22 @@ class FirebaseMcpServer {
         }
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        
+        // Check if it's an index error and extract the index creation URL
+        if (errorMessage.includes('FAILED_PRECONDITION') && errorMessage.includes('requires an index')) {
+          const indexUrl = errorMessage.match(/https:\/\/console\.firebase\.google\.com[^\s]*/)?.[0];
+          return {
+            content: [{
+              type: 'text',
+              text: JSON.stringify({
+                error: 'This query requires a composite index.',
+                details: 'When ordering by multiple fields or combining filters with ordering, you need to create a composite index.',
+                indexUrl: indexUrl || null
+              })
+            }]
+          };
+        }
+
         return {
           content: [{
             type: 'text',
