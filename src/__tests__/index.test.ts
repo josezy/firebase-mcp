@@ -29,7 +29,9 @@ const createDocRefMock = (collection: string, id: string, data?: any) => ({
     data: () => data,
     id,
     ref: { path: `${collection}/${id}`, id }
-  })
+  }),
+  update: vi.fn().mockResolvedValue({}),
+  delete: vi.fn().mockResolvedValue({})
 });
 
 // Mock Firestore collection reference
@@ -61,6 +63,7 @@ const createCollectionMock = (collectionName: string) => {
 
 type FirestoreMock = {
   collection: ReturnType<typeof vi.fn<[collection: string], ReturnType<typeof createCollectionMock>>>;
+  listCollections?: ReturnType<typeof vi.fn>;
 };
 
 // Declare mock variables
@@ -73,6 +76,13 @@ let adminMock: {
   credential: { cert: ReturnType<typeof vi.fn> };
   initializeApp: ReturnType<typeof vi.fn>;
   firestore: () => FirestoreMock;
+  auth?: () => {
+    getUser: ReturnType<typeof vi.fn>;
+    getUserByEmail: ReturnType<typeof vi.fn>;
+  };
+  storage?: () => {
+    bucket: ReturnType<typeof vi.fn>;
+  };
 };
 
 describe('Firebase MCP Server', () => {
@@ -239,7 +249,7 @@ describe('Firebase MCP Server', () => {
       await expect(callToolHandler({
         params: {
           name: 'firestore_list_documents',
-          input: { collection: 'test' }
+          arguments: { collection: 'test' }
         }
       })).resolves.toBeDefined();
     });
@@ -308,7 +318,7 @@ describe('Firebase MCP Server', () => {
       const result = await callToolHandler({
         params: {
           name: 'firestore_add_document',
-          input: { collection: 'test', data: { foo: 'bar' } }
+          arguments: { collection: 'test', data: { foo: 'bar' } }
         }
       });
 
@@ -333,7 +343,7 @@ describe('Firebase MCP Server', () => {
         const result = await callToolHandler({
           params: {
             name: 'firestore_add_document',
-            input: {
+            arguments: {
               collection: 'test',
               data: { foo: 'bar' }
             }
@@ -352,7 +362,7 @@ describe('Firebase MCP Server', () => {
         const result = await callToolHandler({
           params: {
             name: 'firestore_list_documents',
-            input: {
+            arguments: {
               collection: 'test'
             }
           }
@@ -367,7 +377,7 @@ describe('Firebase MCP Server', () => {
         const result = await callToolHandler({
           params: {
             name: 'firestore_list_documents',
-            input: {
+            arguments: {
               collection: 'test',
               filters: [
                 { field: 'status', operator: '==', value: 'active' }
@@ -404,7 +414,7 @@ describe('Firebase MCP Server', () => {
         const result = await callToolHandler({
           params: {
             name: 'firestore_get_document',
-            input: {
+            arguments: {
               collection: 'test',
               id: docId
             }
@@ -427,7 +437,7 @@ describe('Firebase MCP Server', () => {
         const result = await callToolHandler({
           params: {
             name: 'firestore_get_document',
-            input: {
+            arguments: {
               collection: 'test',
               id: 'not-found'
             }
@@ -440,5 +450,444 @@ describe('Firebase MCP Server', () => {
         });
       });
     });
+
+    describe('firestore_update_document', () => {
+      it('should update an existing document', async () => {
+        // Set up test data
+        const testCollection = 'test';
+        const testDocId = 'test-doc';
+        const updateData = { foo: 'updated' };
+        
+        // Create document with update method that properly captures args
+        const docRef = createDocRefMock(testCollection, testDocId, { original: 'data' });
+        const updateMock = vi.fn().mockResolvedValue({});
+        docRef.update = updateMock;
+        
+        // Create collection mock with specific name
+        const collectionMock = createCollectionMock(testCollection);
+        collectionMock.doc.mockReturnValue(docRef);
+        
+        // Configure Firestore mock
+        adminMock.firestore = () => ({
+          collection: vi.fn().mockReturnValue(collectionMock)
+        });
+
+        // Execute the handler
+        const result = await callToolHandler({
+          params: {
+            name: 'firestore_update_document',
+            arguments: {
+              collection: testCollection,
+              id: testDocId,
+              data: updateData
+            }
+          }
+        });
+
+        // Verify update was called with correct data
+        expect(updateMock).toHaveBeenCalledWith(updateData);
+        
+        // Verify response structure
+        const content = JSON.parse(result.content[0].text);
+        expect(content).toEqual({
+          id: testDocId,
+          path: `${testCollection}/${testDocId}`,
+          updated: true
+        });
+      });
+    });
+
+    describe('firestore_delete_document', () => {
+      it('should delete an existing document', async () => {
+        // Set up mock document
+        const docId = 'test-doc';
+        const docRef = createDocRefMock('test', docId, { foo: 'bar' });
+        
+        // Mock delete method
+        docRef.delete = vi.fn().mockResolvedValue({});
+        
+        // Create collection mock with specific name
+        const collectionMock = createCollectionMock('test');
+        collectionMock.doc.mockReturnValue(docRef);
+        
+        adminMock.firestore = () => ({
+          collection: vi.fn().mockReturnValue(collectionMock)
+        });
+
+        const result = await callToolHandler({
+          params: {
+            name: 'firestore_delete_document',
+            arguments: {
+              collection: 'test',
+              id: docId
+            }
+          }
+        });
+
+        const content = JSON.parse(result.content[0].text);
+        expect(content).toEqual({
+          id: docId,
+          path: `test/${docId}`,
+          deleted: true
+        });
+        expect(docRef.delete).toHaveBeenCalled();
+      });
+
+      it('should handle errors during deletion', async () => {
+        // Set up mock document with delete error
+        const docRef = createDocRefMock('test', 'error-doc', { foo: 'bar' });
+        docRef.delete = vi.fn().mockRejectedValue(new Error('Permission denied'));
+        
+        adminMock.firestore = () => ({
+          collection: vi.fn().mockReturnValue({
+            doc: vi.fn().mockReturnValue(docRef)
+          })
+        });
+
+        const result = await callToolHandler({
+          params: {
+            name: 'firestore_delete_document',
+            arguments: {
+              collection: 'test',
+              id: 'error-doc'
+            }
+          }
+        });
+
+        const content = JSON.parse(result.content[0].text);
+        expect(content).toEqual({
+          error: 'Permission denied'
+        });
+      });
+    });
+
+    describe('auth_get_user', () => {
+      it('should get a user by ID', async () => {
+        // Create user object that matches what the implementation expects
+        const userObj = {
+          uid: 'user123',
+          email: 'test@example.com',
+          displayName: 'Test User',
+          emailVerified: false,
+          photoURL: null,
+          disabled: false,
+          metadata: {
+            creationTime: '2023-01-01',
+            lastSignInTime: '2023-01-02'
+          }
+        };
+
+        // Create auth mock with properly implemented methods
+        const authInstance = {
+          getUser: vi.fn().mockResolvedValue(userObj),
+          getUserByEmail: vi.fn().mockRejectedValue(new Error('User not found'))
+        };
+        
+        // Important: Set up admin mock with our authInstance BEFORE the test runs
+        adminMock.auth = vi.fn().mockReturnValue(authInstance);
+
+        // Run the handler with a non-email identifier
+        const result = await callToolHandler({
+          params: {
+            name: 'auth_get_user',
+            arguments: {
+              identifier: 'user123'
+            }
+          }
+        });
+
+        // Verify the correct method was called
+        expect(authInstance.getUser).toHaveBeenCalledWith('user123');
+        expect(authInstance.getUserByEmail).not.toHaveBeenCalled();
+        
+        const content = JSON.parse(result.content[0].text);
+        expect(content).toHaveProperty('user');
+        expect(content.user).toEqual(expect.objectContaining({
+          uid: 'user123',
+          email: 'test@example.com',
+          displayName: 'Test User'
+        }));
+      });
+
+      it('should get a user by email', async () => {
+        // Create user object that matches what the implementation expects
+        const userObj = {
+          uid: 'user123',
+          email: 'test@example.com',
+          displayName: 'Test User',
+          emailVerified: false,
+          photoURL: null,
+          disabled: false,
+          metadata: {
+            creationTime: '2023-01-01',
+            lastSignInTime: '2023-01-02'
+          }
+        };
+
+        // Create auth mock with properly implemented methods
+        const authInstance = {
+          getUser: vi.fn().mockRejectedValue(new Error('User not found')),
+          getUserByEmail: vi.fn().mockResolvedValue(userObj)
+        };
+        
+        // Important: Set up admin mock with our authInstance BEFORE the test runs
+        adminMock.auth = vi.fn().mockReturnValue(authInstance);
+
+        // Run the handler with an email identifier
+        const result = await callToolHandler({
+          params: {
+            name: 'auth_get_user',
+            arguments: {
+              identifier: 'test@example.com'
+            }
+          }
+        });
+
+        // Verify the correct method was called
+        expect(authInstance.getUserByEmail).toHaveBeenCalledWith('test@example.com');
+        expect(authInstance.getUser).not.toHaveBeenCalled();
+        
+        const content = JSON.parse(result.content[0].text);
+        expect(content).toHaveProperty('user');
+        expect(content.user).toEqual(expect.objectContaining({
+          uid: 'user123',
+          email: 'test@example.com',
+          displayName: 'Test User'
+        }));
+      });
+
+      it('should handle user not found', async () => {
+        // Mock auth method with error
+        const authMock = {
+          getUser: vi.fn().mockRejectedValue(new Error('User not found')),
+          getUserByEmail: vi.fn().mockRejectedValue(new Error('User not found'))
+        };
+        
+        adminMock.auth = vi.fn().mockReturnValue(authMock);
+
+        const result = await callToolHandler({
+          params: {
+            name: 'auth_get_user',
+            arguments: {
+              identifier: 'nonexistent'
+            }
+          }
+        });
+
+        const content = JSON.parse(result.content[0].text);
+        expect(content).toEqual(expect.objectContaining({
+          error: 'User not found',
+          details: expect.any(String)
+        }));
+      });
+    });
+
+    describe('storage_list_files', () => {
+      it('should list files in storage', async () => {
+        // Mock storage bucket and list files response
+        const storageMock = {
+          bucket: vi.fn().mockReturnValue({
+            getFiles: vi.fn().mockResolvedValue([
+              [
+                { name: 'file1.txt', metadata: { updated: '2023-01-01' } },
+                { name: 'file2.txt', metadata: { updated: '2023-01-02' } }
+              ]
+            ])
+          })
+        };
+        
+        adminMock.storage = vi.fn().mockReturnValue(storageMock);
+
+        const result = await callToolHandler({
+          params: {
+            name: 'storage_list_files',
+            arguments: {
+              directoryPath: 'test-folder'
+            }
+          }
+        });
+
+        const content = JSON.parse(result.content[0].text);
+        expect(content.files).toHaveLength(2);
+        expect(content.files[0].name).toBe('file1.txt');
+        expect(content.files[0].updated).toBe('2023-01-01');
+        expect(content.files[1].name).toBe('file2.txt');
+        expect(content.files[1].updated).toBe('2023-01-02');
+        expect(storageMock.bucket).toHaveBeenCalled();
+      });
+
+      it('should handle empty directory', async () => {
+        // Mock storage bucket with empty list
+        const storageMock = {
+          bucket: vi.fn().mockReturnValue({
+            getFiles: vi.fn().mockResolvedValue([[]])
+          })
+        };
+        
+        adminMock.storage = vi.fn().mockReturnValue(storageMock);
+
+        const result = await callToolHandler({
+          params: {
+            name: 'storage_list_files',
+            arguments: {
+              directoryPath: 'empty-folder'
+            }
+          }
+        });
+
+        const content = JSON.parse(result.content[0].text);
+        expect(content).toEqual({
+          files: []
+        });
+      });
+
+      it('should handle storage errors', async () => {
+        // Mock storage bucket with error
+        const storageMock = {
+          bucket: vi.fn().mockReturnValue({
+            getFiles: vi.fn().mockRejectedValue(new Error('Access denied'))
+          })
+        };
+        
+        adminMock.storage = vi.fn().mockReturnValue(storageMock);
+
+        const result = await callToolHandler({
+          params: {
+            name: 'storage_list_files',
+            arguments: {
+              directoryPath: 'forbidden-folder'
+            }
+          }
+        });
+
+        const content = JSON.parse(result.content[0].text);
+        expect(content).toEqual(expect.objectContaining({
+          error: 'Failed to list files',
+          details: 'Access denied'
+        }));
+      });
+    });
+
+    describe('storage_get_file_info', () => {
+      it('should get file information', async () => {
+        // Mock file metadata and download URL
+        const fileMock = {
+          exists: vi.fn().mockResolvedValue([true]),
+          getMetadata: vi.fn().mockResolvedValue([{
+            name: 'test.txt',
+            contentType: 'text/plain',
+            size: '1024',
+            updated: '2023-01-01'
+          }]),
+          getSignedUrl: vi.fn().mockResolvedValue(['https://example.com/download-url'])
+        };
+        
+        const storageMock = {
+          bucket: vi.fn().mockReturnValue({
+            file: vi.fn().mockReturnValue(fileMock)
+          })
+        };
+        
+        adminMock.storage = vi.fn().mockReturnValue(storageMock);
+
+        const result = await callToolHandler({
+          params: {
+            name: 'storage_get_file_info',
+            arguments: {
+              filePath: 'test.txt'
+            }
+          }
+        });
+
+        expect(result).toBeDefined();
+        expect(fileMock.getMetadata).toHaveBeenCalled();
+        expect(fileMock.getSignedUrl).toHaveBeenCalled();
+      });
+
+      it('should handle file not found', async () => {
+        // Mock file not found error
+        const fileMock = {
+          exists: vi.fn().mockResolvedValue([false]),
+          getMetadata: vi.fn().mockRejectedValue(new Error('File not found'))
+        };
+        
+        const storageMock = {
+          bucket: vi.fn().mockReturnValue({
+            file: vi.fn().mockReturnValue(fileMock)
+          })
+        };
+        
+        adminMock.storage = vi.fn().mockReturnValue(storageMock);
+
+        const result = await callToolHandler({
+          params: {
+            name: 'storage_get_file_info',
+            arguments: {
+              filePath: 'nonexistent.txt'
+            }
+          }
+        });
+
+        const content = JSON.parse(result.content[0].text);
+        expect(content).toEqual(expect.objectContaining({
+          error: expect.stringContaining('Failed to get file info')
+        }));
+      });
+    });
+
+    describe('firestore_list_collections', () => {
+      it('should list Firestore collections', async () => {
+        // Mock listCollections method
+        const firestoreMock = {
+          listCollections: vi.fn().mockResolvedValue([
+            { id: 'users' },
+            { id: 'products' },
+            { id: 'orders' }
+          ])
+        };
+        
+        adminMock.firestore = vi.fn().mockReturnValue(firestoreMock);
+
+        const result = await callToolHandler({
+          params: {
+            name: 'firestore_list_collections',
+            arguments: {
+              random_string: 'any_value'
+            }
+          }
+        });
+
+        const content = JSON.parse(result.content[0].text);
+        expect(content).toHaveProperty('collections');
+        expect(content.collections).toHaveLength(3);
+        expect(content.collections[0]).toEqual({ id: 'users' });
+        expect(content.collections[1]).toEqual({ id: 'products' });
+        expect(content.collections[2]).toEqual({ id: 'orders' });
+        expect(firestoreMock.listCollections).toHaveBeenCalled();
+      });
+
+      it('should handle errors', async () => {
+        // Mock listCollections with error
+        const firestoreMock = {
+          listCollections: vi.fn().mockRejectedValue(new Error('Permission denied'))
+        };
+        
+        adminMock.firestore = vi.fn().mockReturnValue(firestoreMock);
+
+        const result = await callToolHandler({
+          params: {
+            name: 'firestore_list_collections',
+            arguments: {
+              random_string: 'any_value'
+            }
+          }
+        });
+
+        const content = JSON.parse(result.content[0].text);
+        expect(content).toEqual({
+          error: 'Permission denied'
+        });
+      });
+    });
   });
-}); 
+});
