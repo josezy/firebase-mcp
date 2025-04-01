@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import type { ServerOptions } from '@modelcontextprotocol/sdk/server/index.js';
 import { ListToolsRequestSchema, CallToolRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 import type { App } from 'firebase-admin/app';
+import type { Firestore } from 'firebase-admin/firestore';
 
 // Create mock for Server
 const createServerMock = () => ({
@@ -19,6 +20,49 @@ const createServerMock = () => ({
 
 type ServerMock = ReturnType<typeof createServerMock>;
 
+// Mock Firestore document reference
+const createDocRefMock = (collection: string, id: string, data?: any) => ({
+  id,
+  path: `${collection}/${id}`,
+  get: vi.fn().mockResolvedValue({
+    exists: !!data,
+    data: () => data,
+    id,
+    ref: { path: `${collection}/${id}`, id }
+  })
+});
+
+// Mock Firestore collection reference
+const createCollectionMock = (collectionName: string) => {
+  const docs = new Map();
+  const collectionMock = {
+    doc: vi.fn((id: string) => {
+      if (!docs.has(id)) {
+        docs.set(id, createDocRefMock(collectionName, id));
+      }
+      return docs.get(id);
+    }),
+    add: vi.fn((data) => {
+      const id = Math.random().toString(36).substring(7);
+      const docRef = createDocRefMock(collectionName, id, data);
+      docs.set(id, docRef);
+      return Promise.resolve(docRef);
+    }),
+    where: vi.fn().mockReturnThis(),
+    orderBy: vi.fn().mockReturnThis(),
+    limit: vi.fn().mockReturnThis(),
+    startAfter: vi.fn().mockReturnThis(),
+    get: vi.fn().mockResolvedValue({
+      docs: Array.from(docs.values())
+    })
+  };
+  return collectionMock;
+};
+
+type FirestoreMock = {
+  collection: ReturnType<typeof vi.fn<[collection: string], ReturnType<typeof createCollectionMock>>>;
+};
+
 // Declare mock variables
 let serverConstructor: any;
 let serverMock: ServerMock;
@@ -28,6 +72,7 @@ let adminMock: {
   app: ReturnType<typeof vi.fn<[], App>>;
   credential: { cert: ReturnType<typeof vi.fn> };
   initializeApp: ReturnType<typeof vi.fn>;
+  firestore: () => FirestoreMock;
 };
 
 describe('Firebase MCP Server', () => {
@@ -52,13 +97,17 @@ describe('Firebase MCP Server', () => {
     const originalExit = process.exit;
     process.exit = processExitMock as any;
 
-    // Create admin mock
+    // Create admin mock with Firestore
+    const collectionMock = createCollectionMock('test');
     adminMock = {
       app: vi.fn<[], App>(() => ({ name: '[DEFAULT]' } as App)),
       credential: {
         cert: vi.fn()
       },
-      initializeApp: vi.fn()
+      initializeApp: vi.fn(),
+      firestore: () => ({
+        collection: vi.fn().mockReturnValue(collectionMock)
+      })
     };
 
     // Set up mocks BEFORE importing the module
@@ -217,6 +266,177 @@ describe('Firebase MCP Server', () => {
           expect(serverMock.close).toHaveBeenCalled();
           expect(processExitMock).toHaveBeenCalledWith(0);
           resolve();
+        });
+      });
+    });
+  });
+
+  describe('Tool Execution', () => {
+    let callToolHandler: Function;
+
+    beforeEach(async () => {
+      await import('../index');
+      callToolHandler = serverMock.setRequestHandler.mock.calls.find(
+        call => call[0] === CallToolRequestSchema
+      )[1];
+    });
+
+    it('should handle uninitialized Firebase', async () => {
+      // Force app to be null and firestore to throw
+      adminMock.app.mockImplementation(() => {
+        throw new Error('No app exists');
+      });
+      adminMock.firestore = () => {
+        throw new Error('No app exists');
+      };
+
+      // Re-import to get null app
+      vi.resetModules();
+      
+      // Set up mocks again
+      vi.doMock('@modelcontextprotocol/sdk/server/index.js', () => ({ Server: serverConstructor }));
+      vi.doMock('../utils/logger', () => ({ logger: loggerMock }));
+      vi.doMock('firebase-admin', () => adminMock);
+      
+      await import('../index');
+
+      // Get the new handler after re-importing
+      callToolHandler = serverMock.setRequestHandler.mock.calls.find(
+        call => call[0] === CallToolRequestSchema
+      )[1];
+
+      const result = await callToolHandler({
+        params: {
+          name: 'firestore_add_document',
+          input: { collection: 'test', data: { foo: 'bar' } }
+        }
+      });
+
+      expect(result).toEqual({
+        content: [{
+          type: 'text',
+          text: JSON.stringify({
+            error: 'No app exists'
+          })
+        }]
+      });
+    });
+
+    describe('firestore_add_document', () => {
+      it('should add a document to Firestore', async () => {
+        // Create collection mock with specific name
+        const collectionMock = createCollectionMock('test');
+        adminMock.firestore = () => ({
+          collection: vi.fn().mockReturnValue(collectionMock)
+        });
+
+        const result = await callToolHandler({
+          params: {
+            name: 'firestore_add_document',
+            input: {
+              collection: 'test',
+              data: { foo: 'bar' }
+            }
+          }
+        });
+
+        const content = JSON.parse(result.content[0].text);
+        expect(content).toHaveProperty('id');
+        expect(content).toHaveProperty('path');
+        expect(content.path).toContain('test/');
+      });
+    });
+
+    describe('firestore_list_documents', () => {
+      it('should list documents with default options', async () => {
+        const result = await callToolHandler({
+          params: {
+            name: 'firestore_list_documents',
+            input: {
+              collection: 'test'
+            }
+          }
+        });
+
+        const content = JSON.parse(result.content[0].text);
+        expect(content).toHaveProperty('documents');
+        expect(content).toHaveProperty('nextPageToken');
+      });
+
+      it('should apply filters and ordering', async () => {
+        const result = await callToolHandler({
+          params: {
+            name: 'firestore_list_documents',
+            input: {
+              collection: 'test',
+              filters: [
+                { field: 'status', operator: '==', value: 'active' }
+              ],
+              orderBy: [
+                { field: 'createdAt', direction: 'desc' }
+              ],
+              limit: 10
+            }
+          }
+        });
+
+        const content = JSON.parse(result.content[0].text);
+        expect(content).toHaveProperty('documents');
+        expect(content).toHaveProperty('nextPageToken');
+      });
+    });
+
+    describe('firestore_get_document', () => {
+      it('should get an existing document', async () => {
+        // Set up mock document
+        const docId = 'test-doc';
+        const docData = { foo: 'bar' };
+        const docRef = createDocRefMock('test', docId, docData);
+        
+        // Create collection mock with specific name
+        const collectionMock = createCollectionMock('test');
+        collectionMock.doc.mockReturnValue(docRef);
+        
+        adminMock.firestore = () => ({
+          collection: vi.fn().mockReturnValue(collectionMock)
+        });
+
+        const result = await callToolHandler({
+          params: {
+            name: 'firestore_get_document',
+            input: {
+              collection: 'test',
+              id: docId
+            }
+          }
+        });
+
+        const content = JSON.parse(result.content[0].text);
+        expect(content).toEqual({
+          id: docId,
+          path: `test/${docId}`,
+          data: docData
+        });
+      });
+
+      it('should handle non-existent document', async () => {
+        // Set up mock for non-existent document
+        const docRef = createDocRefMock('test', 'not-found');
+        adminMock.firestore().collection('test').doc.mockReturnValue(docRef);
+
+        const result = await callToolHandler({
+          params: {
+            name: 'firestore_get_document',
+            input: {
+              collection: 'test',
+              id: 'not-found'
+            }
+          }
+        });
+
+        const content = JSON.parse(result.content[0].text);
+        expect(content).toEqual({
+          error: 'Document not found'
         });
       });
     });
