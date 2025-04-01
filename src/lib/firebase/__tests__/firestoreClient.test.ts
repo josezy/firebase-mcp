@@ -148,7 +148,7 @@ describe('Firestore Client', () => {
       
       // Verify error response
       expect(result.isError).toBe(true);
-      expect(result.content[0].text).toMatch(/no entity to update/);
+      expect(result.content[0].text).toMatch(/NOT_FOUND/);
     });
   });
 
@@ -185,7 +185,7 @@ describe('Firestore Client', () => {
       // Verify error response
       const errorMessage = result.content[0].text;
       expect(typeof errorMessage).toBe('string');
-      expect(errorMessage).toMatch(/no entity to delete/);
+      expect(errorMessage).toBe('no entity to delete');
     });
   });
 

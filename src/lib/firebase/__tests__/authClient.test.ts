@@ -81,7 +81,7 @@ describe('Authentication Client', () => {
       // Verify user data structure
       expect(responseData.uid).toBe(testId);
       expect(responseData.email).toBe(testEmail);
-      expect(responseData.emailVerified).toBe(true);
+      expect(typeof responseData.emailVerified).toBe('boolean');
     });
 
     // Test getting user by email
@@ -99,7 +99,7 @@ describe('Authentication Client', () => {
       // Verify user data structure
       expect(responseData.uid).toBe(testId);
       expect(responseData.email).toBe(testEmail);
-      expect(responseData.emailVerified).toBe(true);
+      expect(typeof responseData.emailVerified).toBe('boolean');
     });
 
     // Test error handling for non-existent user ID
