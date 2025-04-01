@@ -1,6 +1,5 @@
 # Source files
 src/
-tsconfig.json
 
 # Testing
 test/
@@ -18,6 +17,9 @@ jest.setup.js
 *.code-workspace
 .specstory/
 .gitignore
+.cursor/
+.scripts/
+coverage/
 
 # Firebase
 firebaseServiceKey.json
@@ -33,3 +35,12 @@ yarn-error.log
 *.env.development.local
 *.env.test.local
 *.env.production.local
+
+#misc
+Dockerfile
+firebase-debug.log
+firebase-mcp.code-workspace
+firebaseServiceKey.json
+firestore-debug.log
+jest.setup.js
+smithery.yaml
