@@ -111,6 +111,20 @@ class FirebaseMcpServer {
           }
         },
         {
+          name: 'firestore_list_documents',
+          description: 'List documents from a Firestore collection',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              collection: {
+                type: 'string',
+                description: 'Collection name'
+              }
+            },
+            required: ['collection']
+          }
+        },
+        {
           name: 'firestore_list_collections',
           description: 'List root collections in Firestore',
           inputSchema: {
@@ -153,6 +167,23 @@ class FirebaseMcpServer {
             };
           }
 
+          case 'firestore_list_documents': {
+            const collection = args.collection as string;
+            const snapshot = await admin.firestore().collection(collection).get();
+            
+            const documents = snapshot.docs.map(doc => ({
+              id: doc.id,
+              path: doc.ref.path
+            }));
+            
+            return {
+              content: [{
+                type: 'text',
+                text: JSON.stringify({ documents })
+              }]
+            };
+          }
+
           case 'firestore_list_collections':
             const collections = await admin.firestore().listCollections();
             const collectionList = collections.map(collection => ({
@@ -173,8 +204,12 @@ class FirebaseMcpServer {
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : 'Unknown error';
         return {
-          result: errorMessage,
-          isError: true
+          content: [{
+            type: 'text',
+            text: JSON.stringify({
+              error: errorMessage
+            })
+          }]
         };
       }
     });
