@@ -67,3 +67,4 @@ firebaseServiceKey.json
 .scripts/
 coverage/
 .github/copilot-instructions.md
+firebase-mcp.code-workspace
