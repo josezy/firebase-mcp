@@ -27,12 +27,12 @@
     "test": "test"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.6.1",
+    "@modelcontextprotocol/sdk": "^1.8.0",
     "firebase-admin": "^13.2.0"
   },
   "devDependencies": {
-    "@types/express": "^5.0.0",
-    "@types/node": "^22.13.10",
+    "@types/express": "^5.0.1",
+    "@types/node": "^22.13.17",
     "@vitest/coverage-v8": "^1.6.1",
     "typescript": "^5.8.2",
     "vitest": "^1.6.1"
