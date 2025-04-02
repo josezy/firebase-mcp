@@ -1,6 +1,7 @@
-const path = require('path');
-const fs = require('fs');
-const admin = require('firebase-admin');
+import path from 'path';
+import fs from 'fs';
+import admin from 'firebase-admin';
+import { vi, beforeAll, afterAll } from 'vitest';
 
 // Configuration
 const USE_EMULATOR = process.env.USE_FIREBASE_EMULATOR === 'true';
@@ -102,10 +103,8 @@ afterAll(async () => {
   }
 }, 10000); // Increase timeout for cleanup
 
-global.console = {
-  ...console,
-  log: jest.fn((message) => process.stdout.write(message + '\n')),
-  info: jest.fn((message) => process.stdout.write(message + '\n')),
-  warn: jest.fn((message) => process.stdout.write(message + '\n')),
-  error: jest.fn((message) => process.stderr.write(message + '\n')),
-};
+// Mock console methods
+console.log = vi.fn((message) => process.stdout.write(message + '\n'));
+console.info = vi.fn((message) => process.stdout.write(message + '\n'));
+console.warn = vi.fn((message) => process.stdout.write(message + '\n'));
+console.error = vi.fn((message) => process.stderr.write(message + '\n')); 

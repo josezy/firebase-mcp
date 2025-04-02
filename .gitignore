@@ -66,3 +66,4 @@ firebaseServiceKey.json
 .cursor/
 .scripts/
 coverage/
+.github/copilot-instructions.md

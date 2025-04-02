@@ -117,4 +117,4 @@ const adminApp = initializeFirebase();
 const db = adminApp ? admin.firestore() : null;
 
 // Export the initialized services and utility functions
-export { db, admin, getProjectId };
+export { db, admin, getProjectId, initializeFirebase };
