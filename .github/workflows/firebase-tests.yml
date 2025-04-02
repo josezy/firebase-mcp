@@ -115,19 +115,20 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-firebase-emulators-
     
-    - name: Modify jest.setup.js to use IPv4 addresses
+    - name: Modify vitest setup to use IPv4 addresses
       run: |
-        # Update jest.setup.js to use 127.0.0.1 instead of localhost
-        sed -i 's/process.env.FIRESTORE_EMULATOR_HOST = .*/process.env.FIRESTORE_EMULATOR_HOST = "127.0.0.1:8080";/g' jest.setup.js
-        sed -i 's/process.env.FIREBASE_AUTH_EMULATOR_HOST = .*/process.env.FIREBASE_AUTH_EMULATOR_HOST = "127.0.0.1:9099";/g' jest.setup.js
-        sed -i 's/process.env.FIREBASE_STORAGE_EMULATOR_HOST = .*/process.env.FIREBASE_STORAGE_EMULATOR_HOST = "127.0.0.1:9199";/g' jest.setup.js
-        
-        # Modify the test user creation to be more reliable
-        sed -i 's/beforeAll(async () => {/beforeAll(async () => {\n  jest.setTimeout(30000);/g' jest.setup.js
-        
-        # Print the modified file for debugging
-        echo "Modified jest.setup.js:"
-        cat jest.setup.js | grep -A 3 "Connect to emulator"
+        # Update vitest.setup.ts to use 127.0.0.1 instead of localhost
+        if [ -f vitest.setup.ts ]; then
+          sed -i 's/process.env.FIRESTORE_EMULATOR_HOST = .*/process.env.FIRESTORE_EMULATOR_HOST = "127.0.0.1:8080";/g' vitest.setup.ts
+          sed -i 's/process.env.FIREBASE_AUTH_EMULATOR_HOST = .*/process.env.FIREBASE_AUTH_EMULATOR_HOST = "127.0.0.1:9099";/g' vitest.setup.ts
+          sed -i 's/process.env.FIREBASE_STORAGE_EMULATOR_HOST = .*/process.env.FIREBASE_STORAGE_EMULATOR_HOST = "127.0.0.1:9199";/g' vitest.setup.ts
+          
+          # Print the modified file for debugging
+          echo "Modified vitest.setup.ts:"
+          cat vitest.setup.ts | grep -A 3 "Firebase initialized for testing"
+        else
+          echo "vitest.setup.ts file not found"
+        fi
     
     - name: Start Firebase Emulators and Run Tests
       run: |
@@ -183,8 +184,8 @@ jobs:
         # Run build
         npm run build --if-present
         
-        # Run all tests with increased timeout
-        npx jest --testTimeout=30000 --forceExit
+        # Run all tests with Vitest
+        npm run test:emulator
         
         # Store the test result
         TEST_RESULT=$?
