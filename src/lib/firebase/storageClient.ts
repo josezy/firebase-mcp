@@ -41,7 +41,7 @@ interface StorageResponse {
  * // Get bucket name for a project
  * const bucketName = getBucketName('my-firebase-project');
  */
-function getBucketName(projectId: string): string {
+export function getBucketName(projectId: string): string {
   // Get bucket name from environment variable or use default format
   const storageBucket = process.env.FIREBASE_STORAGE_BUCKET;
   
@@ -72,7 +72,7 @@ function getBucketName(projectId: string): string {
   return possibleBucketNames[0]; // Default to first format
 }
 
-async function getBucket() {
+export async function getBucket() {
   try {
     const serviceAccountPath = process.env.SERVICE_ACCOUNT_KEY_PATH;
     if (!serviceAccountPath) {

@@ -391,31 +391,51 @@ describe('Firestore Client', () => {
 
   describe('listDocuments', () => {
     it('should list documents with filters', async () => {
-      const dateFilter = {
-        field: 'timestamp',
-        operator: '==' as const,
-        value: testData.timestamp
+      // First ensure we have a document with the expected timestamp
+      // This creates a new document with the exact timestamp we're going to filter on
+      const docWithFilteredTimestamp = {
+        name: 'Filtered Test Document',
+        timestamp: testData.timestamp
       };
+      
+      // Add the document to ensure it exists
+      const addResult = await addDocument(testCollection, docWithFilteredTimestamp);
+      const responseData = JSON.parse(addResult.content[0].text);
+      const addedDocId = responseData.id;
+      
+      try {
+        // Create the filter with the same timestamp
+        const dateFilter = {
+          field: 'timestamp',
+          operator: '==' as const,
+          value: testData.timestamp
+        };
 
-      const result = await listDocuments(testCollection, [dateFilter]);
-      
-      // Verify the response format
-      expect(result.content).toBeDefined();
-      expect(result.content.length).toBe(1);
-      
-      // Parse the response
-      const responseData = JSON.parse(result.content[0].text);
-      
-      // Verify documents array exists
-      expect(Array.isArray(responseData.documents)).toBe(true);
-      expect(responseData.documents.length).toBeGreaterThan(0);
-      
-      // Verify document structure
-      const document = responseData.documents[0];
-      expect(document.id).toBeDefined();
-      expect(document.data).toBeDefined();
-      expect(document.url).toBeDefined();
-      expect(document.data.timestamp).toBe(testData.timestamp);
+        const result = await listDocuments(testCollection, [dateFilter]);
+        
+        // Verify the response format
+        expect(result.content).toBeDefined();
+        expect(result.content.length).toBe(1);
+        
+        // Parse the response
+        const listResponseData = JSON.parse(result.content[0].text);
+        
+        // Verify documents array exists
+        expect(Array.isArray(listResponseData.documents)).toBe(true);
+        expect(listResponseData.documents.length).toBeGreaterThan(0);
+        
+        // Verify document structure
+        const document = listResponseData.documents[0];
+        expect(document.id).toBeDefined();
+        expect(document.data).toBeDefined();
+        expect(document.url).toBeDefined();
+        expect(document.data.timestamp).toBe(testData.timestamp);
+      } finally {
+        // Clean up - remove the document we added for this test
+        if (addedDocId) {
+          await admin.firestore().collection(testCollection).doc(addedDocId).delete();
+        }
+      }
     });
 
     // Test error handling for Firebase initialization issues
@@ -480,6 +500,66 @@ describe('Firestore Client', () => {
         // Restore service account path
         process.env.SERVICE_ACCOUNT_KEY_PATH = originalPath;
       }
+    });
+
+    // Test pagination with pageToken
+    it('should handle pagination with pageToken', async () => {
+      // Create multiple documents to ensure pagination
+      const docIds = [];
+      const batchSize = 5;
+      
+      try {
+        // Create batch of test documents
+        for (let i = 0; i < batchSize; i++) {
+          const docData = {
+            name: `Pagination Test Document ${i}`,
+            index: i,
+            timestamp: testData.timestamp
+          };
+          
+          const addResult = await addDocument(testCollection, docData);
+          const responseData = JSON.parse(addResult.content[0].text);
+          docIds.push(responseData.id);
+        }
+        
+        // First page - get 2 documents
+        const firstPageResult = await listDocuments(testCollection, undefined, 2);
+        const firstPageData = JSON.parse(firstPageResult.content[0].text);
+        
+        // Verify first page
+        expect(firstPageData.documents.length).toBe(2);
+        expect(firstPageData.nextPageToken).toBeDefined();
+        
+        // Second page - use the pageToken from first page
+        const secondPageResult = await listDocuments(
+          testCollection, 
+          undefined, 
+          2, 
+          firstPageData.nextPageToken
+        );
+        
+        const secondPageData = JSON.parse(secondPageResult.content[0].text);
+        
+        // Verify second page
+        expect(secondPageData.documents.length).toBe(2);
+        expect(secondPageData.documents[0].id).not.toBe(firstPageData.documents[0].id);
+        expect(secondPageData.documents[1].id).not.toBe(firstPageData.documents[1].id);
+      } finally {
+        // Clean up test documents
+        for (const docId of docIds) {
+          await admin.firestore().collection(testCollection).doc(docId).delete();
+        }
+      }
+    });
+    
+    // Test handling of invalid pageToken
+    it('should handle invalid pageToken gracefully', async () => {
+      const result = await listDocuments(testCollection, undefined, 5, 'invalid/document/path');
+      
+      // Invalid document path will result in an error
+      expect(result.isError).toBe(true);
+      expect(result.content).toBeDefined();
+      expect(result.content[0].type).toBe('error');
     });
   });
 
@@ -546,6 +626,68 @@ describe('Firestore Client', () => {
       } finally {
         // Restore the original service account path
         process.env.SERVICE_ACCOUNT_KEY_PATH = originalPath;
+      }
+    });
+
+    // Test listing subcollections of a document
+    it('should list subcollections of a document when documentPath is provided', async () => {
+      // First create a document with a subcollection
+      const parentDocId = 'parent-doc-with-subcollection';
+      const subcollectionName = 'test_subcollection';
+      const subcollectionDocId = 'subtest-doc';
+      
+      try {
+        // Create parent document
+        await admin.firestore().collection(testCollection).doc(parentDocId).set({
+          name: 'Parent Document'
+        });
+        
+        // Create a document in a subcollection
+        await admin.firestore()
+          .collection(testCollection)
+          .doc(parentDocId)
+          .collection(subcollectionName)
+          .doc(subcollectionDocId)
+          .set({ name: 'Subcollection Document' });
+        
+        // List subcollections
+        const documentPath = `${testCollection}/${parentDocId}`;
+        const result = await list_collections(documentPath);
+        
+        // Verify the response format
+        expect(result.content).toBeDefined();
+        expect(result.content.length).toBe(1);
+        
+        // Parse the response
+        const responseData = JSON.parse(result.content[0].text);
+        
+        // Verify collections array exists
+        expect(Array.isArray(responseData.collections)).toBe(true);
+        
+        // The subcollection should be in the result
+        const foundSubcollection = responseData.collections.find(
+          (col: any) => col.id === subcollectionName
+        );
+        expect(foundSubcollection).toBeDefined();
+        expect(foundSubcollection.path).toContain(parentDocId);
+        expect(foundSubcollection.url).toBeDefined();
+      } finally {
+        // Clean up - delete the test documents
+        try {
+          await admin.firestore()
+            .collection(testCollection)
+            .doc(parentDocId)
+            .collection(subcollectionName)
+            .doc(subcollectionDocId)
+            .delete();
+            
+          await admin.firestore()
+            .collection(testCollection)
+            .doc(parentDocId)
+            .delete();
+        } catch (error) {
+          console.error('Cleanup error:', error);
+        }
       }
     });
   });
