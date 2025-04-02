@@ -680,6 +680,29 @@ describe('Firebase MCP Server', () => {
           details: expect.any(String)
         }));
       });
+
+      it('should handle authentication errors properly', async () => {
+        // Mock auth with custom error types
+        const authInstance = {
+          getUser: vi.fn().mockRejectedValue(new Error('Invalid auth token')),
+          getUserByEmail: vi.fn().mockRejectedValue(new Error('Invalid auth token'))
+        };
+        
+        adminMock.auth = vi.fn().mockReturnValue(authInstance);
+
+        const result = await callToolHandler({
+          params: {
+            name: 'auth_get_user',
+            arguments: {
+              identifier: 'user123'
+            }
+          }
+        });
+
+        const content = JSON.parse(result.content[0].text);
+        expect(content).toHaveProperty('error', 'User not found');
+        expect(content).toHaveProperty('details', 'Invalid auth token');
+      });
     });
 
     describe('storage_list_files', () => {
@@ -765,6 +788,71 @@ describe('Firebase MCP Server', () => {
           error: 'Failed to list files',
           details: 'Access denied'
         }));
+      });
+
+      it('should handle missing bucket name', async () => {
+        // Mock storage.bucket with null name
+        const storageMock = {
+          bucket: vi.fn().mockReturnValue({
+            name: null, // Missing bucket name
+            getFiles: vi.fn().mockResolvedValue([
+              [{ name: 'file1.txt', metadata: { size: 100 } }]
+            ])
+          })
+        };
+        
+        adminMock.storage = vi.fn().mockReturnValue(storageMock);
+
+        const result = await callToolHandler({
+          params: {
+            name: 'storage_list_files',
+            arguments: {}
+          }
+        });
+
+        // The function should still work even with null bucket name
+        const content = JSON.parse(result.content[0].text);
+        expect(content).toHaveProperty('files');
+        expect(content.files[0]).toHaveProperty('name', 'file1.txt');
+      });
+
+      it('should handle files with missing metadata', async () => {
+        // Mock storage with files that have missing or unusual metadata
+        const storageMock = {
+          bucket: vi.fn().mockReturnValue({
+            name: 'test-bucket',
+            getFiles: vi.fn().mockResolvedValue([
+              [
+                // File with missing metadata fields
+                { name: 'file1.txt', metadata: {} },
+                // File with unusual metadata types
+                { 
+                  name: 'file2.txt', 
+                  metadata: { 
+                    size: new Date(), // Non-string size
+                    contentType: null,
+                    updated: undefined,
+                    md5Hash: 123456 // Number instead of string
+                  } 
+                }
+              ]
+            ])
+          })
+        };
+        
+        adminMock.storage = vi.fn().mockReturnValue(storageMock);
+
+        const result = await callToolHandler({
+          params: {
+            name: 'storage_list_files',
+            arguments: {}
+          }
+        });
+
+        // Function should handle these edge cases gracefully
+        const content = JSON.parse(result.content[0].text);
+        expect(content).toHaveProperty('files');
+        expect(content.files).toHaveLength(2);
       });
     });
 
@@ -887,6 +975,90 @@ describe('Firebase MCP Server', () => {
         expect(content).toEqual({
           error: 'Permission denied'
         });
+      });
+    });
+
+    it('should handle Firebase index errors', async () => {
+      // Create a mock error that simulates Firebase's "requires an index" error
+      const indexError = new Error(
+        'FAILED_PRECONDITION: The query requires an index. ' +
+        'You can create it here: https://console.firebase.google.com/project/test-project/database/firestore/indexes'
+      );
+      
+      // Mock the collection to throw this specific error
+      const collectionMock = createCollectionMock('test');
+      collectionMock.get.mockRejectedValue(indexError);
+      
+      adminMock.firestore = () => ({
+        collection: vi.fn().mockReturnValue(collectionMock)
+      });
+
+      const result = await callToolHandler({
+        params: {
+          name: 'firestore_list_documents',
+          arguments: {
+            collection: 'test',
+            filters: [{ field: 'status', operator: '==', value: 'active' }],
+            orderBy: [{ field: 'createdAt', direction: 'desc' }]
+          }
+        }
+      });
+
+      const content = JSON.parse(result.content[0].text);
+      expect(content).toHaveProperty('error', 'This query requires a composite index.');
+      expect(content).toHaveProperty('details');
+      expect(content).toHaveProperty('indexUrl');
+      expect(content.indexUrl).toContain('console.firebase.google.com');
+    });
+
+    describe('firestore_get_document', () => {
+      it('should sanitize document data with various types', async () => {
+        // Create mock document with complex data types
+        const docId = 'complex-data-doc';
+        const mockDate = new Date('2023-01-01');
+        const complexData = {
+          string: 'text value',
+          number: 123,
+          boolean: true,
+          null: null,
+          date: mockDate,
+          array: [1, 2, 3],
+          nestedObject: { foo: 'bar' },
+          unusualType: Symbol('test'),
+          undefinedValue: undefined
+        };
+        
+        const docRef = createDocRefMock('test', docId, complexData);
+        
+        // Create collection mock
+        const collectionMock = createCollectionMock('test');
+        collectionMock.doc.mockReturnValue(docRef);
+        
+        adminMock.firestore = () => ({
+          collection: vi.fn().mockReturnValue(collectionMock)
+        });
+
+        const result = await callToolHandler({
+          params: {
+            name: 'firestore_get_document',
+            arguments: {
+              collection: 'test',
+              id: docId
+            }
+          }
+        });
+
+        // Verify data sanitization worked correctly
+        const content = JSON.parse(result.content[0].text);
+        expect(content).toHaveProperty('data');
+        expect(content.data.string).toBe('text value');
+        expect(content.data.number).toBe(123);
+        expect(content.data.boolean).toBe(true);
+        expect(content.data.null).toBe(null);
+        expect(content.data.date).toBe(mockDate.toISOString());
+        expect(content.data.array).toBe('[1, 2, 3]');
+        expect(content.data.nestedObject).toBe('[Object]');
+        expect(typeof content.data.unusualType).toBe('string');
       });
     });
   });
