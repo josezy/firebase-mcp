@@ -68,3 +68,4 @@ firebaseServiceKey.json
 coverage/
 .github/copilot-instructions.md
 firebase-mcp.code-workspace
+.cursorignore
