@@ -18,6 +18,10 @@ The [Model Context Protocol (MCP)](https://github.com/modelcontextprotocol) is a
 
 The server exposes Firebase services through MCP tools, making them accessible to LLM clients including [Claude Desktop](https://claude.ai/download), [Cursor](https://www.cursor.com/), [Roo Code](https://github.com/RooVetGit/Roo-Code), and [Cline](https://cline.bot/), while handling authentication and connection management.
 
+## 🔥 New in v1.3.0: Collection Group Queries
+
+Firebase MCP now supports querying sub-collections (collection groups) in Firestore! This allows you to query across all sub-collections with the same name, regardless of their parent document - making it easy to search across your entire database hierarchy with a single query. Perfect for cross-document searches, activity feeds, and unified dashboards.
+
 ## Setup
 
 > The easiest way to install the Firebase MCP server is to simply feed your LLM client (like Cline) the [llms-install.md](./llms-install.md) file.
@@ -179,7 +183,7 @@ To make sure everything is working, simply prompt your client: `Please run throu
   }
   ```
 
-- `firestore_query_collection_group`: Query documents across all subcollections with the same name
+- `firestore_query_collection_group`: Query documents across all sub-collections 🆕
 
   ```typescript
   {
