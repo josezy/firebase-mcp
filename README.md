@@ -251,7 +251,7 @@ Each client module implements specific Firebase service operations and exposes t
 
 1. Fork the repository
 2. Create a feature branch
-3. Implement changes with tests
+3. Implement changes with tests (80%+ coverage required to pass CI workflow)
 4. Submit a pull request
 
 ## License
