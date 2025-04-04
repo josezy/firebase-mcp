@@ -831,11 +831,29 @@ class FirebaseMcpServer {
               };
             } catch (error) {
               logger.error('Error in collection group query:', error);
+              
+              // Special handling for Firebase index errors
+              const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+              if (errorMessage.includes('FAILED_PRECONDITION') && errorMessage.includes('requires an index')) {
+                const indexUrl = errorMessage.match(/https:\/\/console\.firebase\.google\.com[^\s]*/)?.[0];
+                return {
+                  content: [{
+                    type: 'text',
+                    text: JSON.stringify({
+                      error: 'This query requires a composite index.',
+                      details: 'When ordering by multiple fields or combining filters with ordering, you need to create a composite index.',
+                      indexUrl: indexUrl || null,
+                      message: errorMessage
+                    })
+                  }]
+                };
+              }
+              
               return {
                 content: [{
                   type: 'text',
                   text: JSON.stringify({
-                    error: error instanceof Error ? error.message : 'Unknown error'
+                    error: errorMessage
                   })
                 }]
               };

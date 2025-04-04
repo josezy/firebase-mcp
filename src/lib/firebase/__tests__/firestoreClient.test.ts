@@ -747,13 +747,21 @@ describe('Firestore Client', () => {
         // Parse the response
         const responseData = JSON.parse(result.content[0].text);
         
-        // Verify documents array exists and has correct length
+        // Verify documents array exists
         expect(Array.isArray(responseData.documents)).toBe(true);
-        expect(responseData.documents.length).toBe(2); // Should find both comments
+        
+        // Instead of checking total count, filter to only include our test documents
+        const testDocuments = responseData.documents.filter((doc: any) => 
+          doc.path.includes(`${testCollection}/${parentDoc1Id}/${subcollectionName}`) || 
+          doc.path.includes(`${testCollection}/${parentDoc2Id}/${subcollectionName}`)
+        );
+        
+        // Verify we have our 2 test documents
+        expect(testDocuments.length).toBe(2);
         
         // Verify both documents are returned with correct data
-        const document1 = responseData.documents.find((doc: any) => doc.id === 'comment1');
-        const document2 = responseData.documents.find((doc: any) => doc.id === 'comment2');
+        const document1 = testDocuments.find((doc: any) => doc.id === 'comment1');
+        const document2 = testDocuments.find((doc: any) => doc.id === 'comment2');
         
         expect(document1).toBeDefined();
         expect(document1.data.author).toBe('User A');
