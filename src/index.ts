@@ -291,6 +291,69 @@ class FirebaseMcpServer {
             properties: {},
             required: []
           }
+        },
+        {
+          name: 'firestore_query_collection_group',
+          description: 'Query documents across all subcollections with the same name (collection group query)',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              collectionId: {
+                type: 'string',
+                description: 'The collection ID to query across all documents (without parent path)'
+              },
+              filters: {
+                type: 'array',
+                description: 'Optional filters to apply to the query',
+                items: {
+                  type: 'object',
+                  properties: {
+                    field: { 
+                      type: 'string',
+                      description: 'Field name to filter' 
+                    },
+                    operator: { 
+                      type: 'string', 
+                      description: 'Comparison operator (==, !=, <, <=, >, >=, array-contains, array-contains-any, in, not-in)' 
+                    },
+                    value: { 
+                      description: 'Value to compare against' 
+                    }
+                  },
+                  required: ['field', 'operator', 'value']
+                }
+              },
+              orderBy: {
+                type: 'array',
+                description: 'Optional fields to order results by',
+                items: {
+                  type: 'object',
+                  properties: {
+                    field: { 
+                      type: 'string',
+                      description: 'Field name to order by' 
+                    },
+                    direction: { 
+                      type: 'string', 
+                      enum: ['asc', 'desc'],
+                      default: 'asc',
+                      description: 'Sort direction (asc or desc)'
+                    }
+                  },
+                  required: ['field']
+                }
+              },
+              limit: {
+                type: 'number',
+                description: 'Maximum number of documents to return (default: 20, max: 100)'
+              },
+              pageToken: {
+                type: 'string',
+                description: 'Token for pagination (document path to start after)'
+              }
+            },
+            required: ['collectionId']
+          }
         }
       ]
     }));
@@ -671,6 +734,113 @@ class FirebaseMcpServer {
                 text: JSON.stringify({ collections: collectionList })
               }]
             };
+
+          case 'firestore_query_collection_group': {
+            const collectionId = args.collectionId as string;
+            const limit = Math.min(Math.max(1, (args.limit as number) || 20), 100); // Default 20, max 100
+            
+            try {
+              // Use the collectionGroup API directly here instead of importing
+              let query: any = admin.firestore().collectionGroup(collectionId);
+
+              // Apply filters if provided
+              const filters = args.filters as Array<{
+                field: string;
+                operator: admin.firestore.WhereFilterOp;
+                value: any;
+              }> | undefined;
+
+              if (filters && filters.length > 0) {
+                filters.forEach(filter => {
+                  query = query.where(filter.field, filter.operator, filter.value);
+                });
+              }
+
+              // Apply ordering if provided
+              const orderBy = args.orderBy as Array<{
+                field: string;
+                direction?: 'asc' | 'desc';
+              }> | undefined;
+
+              if (orderBy && orderBy.length > 0) {
+                orderBy.forEach(order => {
+                  query = query.orderBy(order.field, order.direction || 'asc');
+                });
+              }
+
+              // Apply pagination if pageToken is provided
+              const pageToken = args.pageToken as string | undefined;
+              if (pageToken) {
+                const lastDoc = await admin.firestore().doc(pageToken).get();
+                if (lastDoc.exists) {
+                  query = query.startAfter(lastDoc);
+                }
+              }
+              
+              // Apply limit
+              query = query.limit(limit);
+              
+              const snapshot = await query.get();
+              
+              const documents = snapshot.docs.map((doc: FirebaseFirestore.QueryDocumentSnapshot) => {
+                const rawData = doc.data();
+                // Sanitize data to ensure it's JSON-serializable
+                const data = Object.entries(rawData).reduce((acc, [key, value]) => {
+                  // Handle basic types directly
+                  if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean' || value === null) {
+                    acc[key] = value;
+                  }
+                  // Convert Date objects to ISO strings
+                  else if (value instanceof Date) {
+                    acc[key] = value.toISOString();
+                  }
+                  // Convert arrays to strings
+                  else if (Array.isArray(value)) {
+                    acc[key] = `[${value.join(', ')}]`;
+                  }
+                  // Convert other objects to string representation
+                  else if (typeof value === 'object') {
+                    acc[key] = '[Object]';
+                  }
+                  // Convert other types to strings
+                  else {
+                    acc[key] = String(value);
+                  }
+                  return acc;
+                }, {} as Record<string, any>);
+
+                return {
+                  id: doc.id,
+                  path: doc.ref.path,
+                  data
+                };
+              });
+
+              // Get the last document for pagination
+              const lastVisible = snapshot.docs[snapshot.docs.length - 1];
+              const nextPageToken = lastVisible ? lastVisible.ref.path : null;
+              
+              return {
+                content: [{
+                  type: 'text',
+                  text: JSON.stringify({
+                    documents,
+                    nextPageToken
+                  })
+                }]
+              };
+            } catch (error) {
+              logger.error('Error in collection group query:', error);
+              return {
+                content: [{
+                  type: 'text',
+                  text: JSON.stringify({
+                    error: error instanceof Error ? error.message : 'Unknown error'
+                  })
+                }]
+              };
+            }
+          }
 
           default:
             throw new McpError(ErrorCode.MethodNotFound, `Unknown tool: ${name}`);

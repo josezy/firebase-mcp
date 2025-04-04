@@ -372,3 +372,122 @@ export async function deleteDocument(collection: string, id: string): Promise<Fi
     };
   }
 }
+
+/**
+ * Queries across all subcollections with the same name regardless of their parent document.
+ * This is useful for searching data across multiple parent documents.
+ * 
+ * @param {string} collectionId - The collection ID to query (without parent path)
+ * @param {Array<Object>} [filters=[]] - Array of filter conditions with field, operator, and value
+ * @param {Array<Object>} [orderBy=[]] - Array of fields to order results by
+ * @param {number} [limit=20] - Maximum number of documents to return
+ * @param {string} [pageToken] - Token for pagination (document path to start after)
+ * @returns {Promise<Object>} MCP-formatted response with document data
+ * @throws {Error} If Firebase is not initialized or if there's a Firestore error
+ * 
+ * @example
+ * // Query across all 'comments' subcollections
+ * const allComments = await queryCollectionGroup('comments');
+ * 
+ * @example
+ * // Query with filtering
+ * const filteredComments = await queryCollectionGroup('comments', [
+ *   { field: 'rating', operator: '>', value: 3 }
+ * ]);
+ */
+export async function queryCollectionGroup(
+  collectionId: string,
+  filters?: Array<{ field: string, operator: FirebaseFirestore.WhereFilterOp, value: any }>,
+  orderBy?: Array<{ field: string, direction?: 'asc' | 'desc' }>,
+  limit: number = 20,
+  pageToken?: string
+): Promise<FirestoreResponse> {
+  try {
+    // Use any to bypass TypeScript type check for collectionGroup
+    // The Firebase types are sometimes inconsistent between versions
+    let query: any = admin.firestore().collectionGroup(collectionId);
+
+    // Apply filters if provided
+    if (filters && filters.length > 0) {
+      filters.forEach(filter => {
+        query = query.where(filter.field, filter.operator, filter.value);
+      });
+    }
+
+    // Apply ordering if provided
+    if (orderBy && orderBy.length > 0) {
+      orderBy.forEach(order => {
+        query = query.orderBy(order.field, order.direction || 'asc');
+      });
+    }
+
+    // Apply pagination if pageToken is provided
+    if (pageToken) {
+      try {
+        const lastDoc = await admin.firestore().doc(pageToken).get();
+        if (lastDoc.exists) {
+          query = query.startAfter(lastDoc);
+        }
+      } catch (error) {
+        return {
+          content: [{ type: 'error', text: `Invalid pagination token: ${error instanceof Error ? error.message : 'Unknown error'}` }],
+          isError: true
+        };
+      }
+    }
+    
+    // Apply limit
+    query = query.limit(limit);
+    
+    const snapshot = await query.get();
+    const serviceAccountPath = process.env.SERVICE_ACCOUNT_KEY_PATH;
+    if (!serviceAccountPath) {
+      return {
+        content: [{ type: 'error', text: 'Service account path not set' }],
+        isError: true
+      };
+    }
+
+    const projectId = getProjectId(serviceAccountPath);
+    if (!projectId) {
+      return {
+        content: [{ type: 'error', text: 'Could not determine project ID' }],
+        isError: true
+      };
+    }
+
+    const documents = snapshot.docs.map((doc: FirebaseFirestore.QueryDocumentSnapshot) => {
+      // For collection groups, we need to use the full path for the URL
+      const fullPath = doc.ref.path;
+      const consoleUrl = `https://console.firebase.google.com/project/${projectId}/firestore/data/${fullPath}`;
+      
+      // Handle Timestamp and other Firestore types
+      const data = convertTimestampsToISO(doc.data());
+      
+      return {
+        id: doc.id,
+        path: fullPath,
+        data,
+        url: consoleUrl
+      };
+    });
+
+    // Get the last document for pagination
+    const lastVisible = snapshot.docs[snapshot.docs.length - 1];
+    const nextPageToken = lastVisible ? lastVisible.ref.path : undefined;
+    
+    // Ensure we're creating valid JSON by serializing and handling special characters
+    const responseObj = { documents, nextPageToken };
+    const jsonText = JSON.stringify(responseObj);
+    
+    return {
+      content: [{ type: 'json', text: jsonText }]
+    };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    return {
+      content: [{ type: 'error', text: errorMessage }],
+      isError: true
+    };
+  }
+}
