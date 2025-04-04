@@ -17,7 +17,33 @@ process.env.SERVICE_ACCOUNT_KEY_PATH = SERVICE_ACCOUNT_KEY_PATH;
 // Initialize Firebase
 function initializeFirebase() {
   try {
+    // Connect to emulator if configured
+    if (USE_EMULATOR) {
+      process.env.FIRESTORE_EMULATOR_HOST = '127.0.0.1:8080';
+      process.env.FIREBASE_AUTH_EMULATOR_HOST = '127.0.0.1:9099';
+      process.env.FIREBASE_STORAGE_EMULATOR_HOST = '127.0.0.1:9199';
+      console.log('Using Firebase emulator suite');
+      
+      // When using emulators, we don't need a real service account
+      if (admin.apps.length === 0) {
+        admin.initializeApp({
+          projectId: 'demo-project',
+          storageBucket: 'demo-project.appspot.com'
+        });
+        console.log('Firebase initialized for testing with emulators');
+      }
+      
+      return admin;
+    }
+    
+    // For non-emulator mode, we need a real service account
     const serviceAccountPath = SERVICE_ACCOUNT_KEY_PATH;
+    
+    // Check if service account file exists
+    if (!fs.existsSync(serviceAccountPath)) {
+      throw new Error(`Service account key file not found at ${serviceAccountPath}. Set SERVICE_ACCOUNT_KEY_PATH or use USE_FIREBASE_EMULATOR=true.`);
+    }
+    
     const serviceAccount = JSON.parse(fs.readFileSync(serviceAccountPath, 'utf8'));
 
     // Check if Firebase is already initialized
@@ -28,15 +54,7 @@ function initializeFirebase() {
         storageBucket: `${serviceAccount.project_id}.firebasestorage.app`
       });
 
-      console.log('Firebase initialized for testing');
-    }
-
-    // Connect to emulator if configured
-    if (USE_EMULATOR) {
-      process.env.FIRESTORE_EMULATOR_HOST = 'localhost:8080';
-      process.env.FIREBASE_AUTH_EMULATOR_HOST = 'localhost:9099';
-      process.env.FIREBASE_STORAGE_EMULATOR_HOST = 'localhost:9199';
-      console.log('Using Firebase emulator suite');
+      console.log('Firebase initialized for testing with real Firebase');
     }
 
     return admin;
