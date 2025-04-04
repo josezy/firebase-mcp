@@ -179,6 +179,25 @@ To make sure everything is working, simply prompt your client: `Please run throu
   }
   ```
 
+- `firestore_query_collection_group`: Query documents across all subcollections with the same name
+
+  ```typescript
+  {
+    collectionId: string,       // The collection ID to query across all documents
+    filters?: Array<{           // Optional filters
+      field: string,
+      operator: string,         // ==, !=, <, <=, >, >=, array-contains, array-contains-any, in, not-in
+      value: any
+    }>,
+    orderBy?: Array<{           // Optional fields to order by
+      field: string,
+      direction?: 'asc' | 'desc' // Default: 'asc'
+    }>,
+    limit?: number,             // Maximum documents to return (default: 20, max: 100)
+    pageToken?: string          // Token for pagination
+  }
+  ```
+
 ### Storage Tools
 
 - `storage_list_files`: List files in a directory
@@ -209,7 +228,7 @@ npm run build
 
 ### Testing
 
-The project uses Jest for testing. Tests can be run against Firebase emulators to avoid affecting production data.
+The project uses Vitest for testing. Tests can be run against Firebase emulators to avoid affecting production data.
 
 1. **Install Firebase Emulators**
 
@@ -297,6 +316,14 @@ If you see this error:
 2. Check service account permissions
    - Ensure the service account has the necessary permissions for the Firebase services you're using
    - For Storage, the service account needs the Storage Admin role
+
+#### "This query requires a composite index" Error
+
+If you see this error when using `firestore_query_collection_group` with filters or ordering:
+
+1. Follow the provided URL in the error message to create the required index
+2. Once the index is created (which may take a few minutes), retry your query
+3. For complex queries with multiple fields, you might need to create multiple indexes
 
 #### JSON Parsing Errors
 

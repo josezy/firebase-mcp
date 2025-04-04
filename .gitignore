@@ -42,12 +42,6 @@ web_modules/
 .parcel-cache
 
 # Next.js build output
-.next
-out
-
-# Nuxt.js build / generate output
-.nuxt
-dist
 
 # Stores VSCode versions used for testing VSCode extensions
 .vscode-test
@@ -61,7 +55,7 @@ dist
 .DS_Store
 
 # project specific files
-firebaseServiceKey.json
+
 .specstory/
 .cursor/
 .scripts/
@@ -69,6 +63,12 @@ coverage/
 .github/copilot-instructions.md
 firebase-mcp.code-workspace
 .cursorignore
+test-output/
 
-# Ignore SpecStory derived-cursor-rules.mdc backup files
-.specstory/cursor_rules_backups/*
+# firebase files
+firebaseServiceKey.json
+.firebaserc
+firebase.json
+firestore.indexes.json
+firestore.rules
+storage.rules

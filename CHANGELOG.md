@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.0] - 2024-04-05
+
+### Added
+
+- Added new `firestore_query_collection_group` tool to query documents across subcollections with the same name (commit [92b0548](https://github.com/gannonh/firebase-mcp/commit/92b0548))
+- Implemented automatic extraction of Firebase console URLs for creating composite indexes when required (commit [cf9893b](https://github.com/gannonh/firebase-mcp/commit/cf9893b))
+
+### Fixed
+
+- Enhanced error handling for Firestore queries that require composite indexes (commit [cf9893b](https://github.com/gannonh/firebase-mcp/commit/cf9893b))
+- Improved test validations to be more resilient to pre-existing test data (commit [cf9893b](https://github.com/gannonh/firebase-mcp/commit/cf9893b))
+
+### Changed
+
+- Updated README to specify 80%+ test coverage requirement for CI (commit [69a3e18](https://github.com/gannonh/firebase-mcp/commit/69a3e18))
+- Updated `.gitignore` to exclude workspace configuration files (commit [ca42d0f](https://github.com/gannonh/firebase-mcp/commit/ca42d0f))
+
 ## [1.1.4] - 2024-04-01
 
 ### Changed
