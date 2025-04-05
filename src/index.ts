@@ -144,6 +144,7 @@ class FirebaseMcpServer {
                       description: 'Comparison operator (==, >, <, >=, <=, array-contains, in, array-contains-any)'
                     },
                     value: {
+                      type: 'string',
                       description: 'Value to compare against (use ISO format for dates)'
                     }
                   },
@@ -317,6 +318,7 @@ class FirebaseMcpServer {
                       description: 'Comparison operator (==, !=, <, <=, >, >=, array-contains, array-contains-any, in, not-in)' 
                     },
                     value: { 
+                      type: 'string',
                       description: 'Value to compare against' 
                     }
                   },
