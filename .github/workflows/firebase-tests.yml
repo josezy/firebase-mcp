@@ -5,9 +5,9 @@ name: Firebase Tests CI
 
 on:
   push:
-    branches: [ "main" ]  
+    branches: [ "main" ]
   pull_request:
-    branches: [ "main" ]  
+    branches: [ "main" ]
 
 jobs:
   test:
@@ -27,13 +27,19 @@ jobs:
     - run: npm ci
 
     - name: Check code formatting
-      run: npm run format:check
+      run: |
+        # Check if format:check script exists, if not add it
+        if ! grep -q "\"format:check\"" package.json; then
+          echo "Adding format:check script to package.json"
+          sed -i 's/"format": "prettier --write \\"src\\\/\\\*\\\*\\\/\\\*.{ts,tsx}\\\"",/"format": "prettier --write \\"src\\\/\\\*\\\*\\\/\\\*.{ts,tsx}\\\"",\n    "format:check": "prettier --check \\"src\\\/\\\*\\\*\\\/\\\*.{ts,tsx}\\\"",/g' package.json
+        fi
+        npm run format:check
 
     - name: Run ESLint
       run: npm run lint
 
-    - name: Install Firebase CLI and tools
-      run: npm install -g firebase-tools json
+    - name: Install Firebase CLI
+      run: npm install -g firebase-tools
 
     - name: Create Firebase project config for emulators
       run: |
@@ -174,11 +180,11 @@ jobs:
           exit 1
         fi
 
-        # Create test user directly in the Auth emulator
-        echo "Creating test user directly in Auth emulator..."
-        curl -X POST "http://127.0.0.1:9099/identitytoolkit.googleapis.com/v1/projects/demo-project/accounts" \
-          -H "Content-Type: application/json" \
-          --data-binary '{"localId":"testid","email":"test@example.com","password":"password123","emailVerified":true}'
+        # Create test user directly in Auth emulator using Firebase CLI
+        echo "Creating test user in Auth emulator using Firebase CLI..."
+        firebase auth:import --project demo-project --hash-algo=BCRYPT <<EOF
+{"users":[{"localId":"testid","email":"test@example.com","passwordHash":"JDJhJDEwJDNxbW9vQzVHRmNRNUdDQnlCZUFRbE9WLnlrVEVvU0JTd2JXSEhGY1FLdUh0Qy5GRnhWTHU2","salt":"salt","displayName":"Test User","emailVerified":true}]}
+EOF
 
         # Set environment variables for tests
         export USE_FIREBASE_EMULATOR=true
@@ -188,27 +194,48 @@ jobs:
         export FIREBASE_STORAGE_EMULATOR_HOST="127.0.0.1:9199"
         export FIREBASE_STORAGE_BUCKET="demo-project.appspot.com"
 
-        # Create a custom preflight script for emulator tests
-        echo '{
-          "scripts": {
-            "preflight:emulator": "npm run format:check && npm run lint && npm run test:emulator && npm run build"
-          }
-        }' > preflight-temp.json
+        # Run each step individually instead of using a custom preflight script
+        echo "Running format check..."
+        # Check if format:check script exists, if not add it
+        if ! grep -q "\"format:check\"" package.json; then
+          echo "Adding format:check script to package.json"
+          sed -i 's/"format": "prettier --write \\"src\\\/\\\*\\\*\\\/\\\*.{ts,tsx}\\\"",/"format": "prettier --write \\"src\\\/\\\*\\\*\\\/\\\*.{ts,tsx}\\\"",\n    "format:check": "prettier --check \\"src\\\/\\\*\\\*\\\/\\\*.{ts,tsx}\\\"",/g' package.json
+        fi
+        npm run format:check
+        FORMAT_RESULT=$?
+        if [ $FORMAT_RESULT -ne 0 ]; then
+          echo "Format check failed"
+          exit $FORMAT_RESULT
+        fi
 
-        # Merge the temporary script into package.json
-        npx json -f package.json -I -e "this.scripts['preflight:emulator']=require('./preflight-temp.json').scripts['preflight:emulator']"
+        echo "Running lint..."
+        npm run lint
+        LINT_RESULT=$?
+        if [ $LINT_RESULT -ne 0 ]; then
+          echo "Lint failed"
+          exit $LINT_RESULT
+        fi
 
-        # Run the preflight script with emulator tests
-        npm run preflight:emulator
-
-        # Store the test result
+        echo "Running tests in emulator mode..."
+        npm run test:emulator
         TEST_RESULT=$?
+        if [ $TEST_RESULT -ne 0 ]; then
+          echo "Tests failed"
+          exit $TEST_RESULT
+        fi
+
+        echo "Running build..."
+        npm run build
+        BUILD_RESULT=$?
+
+        # Store the final result
+        if [ $BUILD_RESULT -ne 0 ]; then
+          echo "Build failed"
+          exit $BUILD_RESULT
+        fi
 
         # Kill the emulator process
         kill $EMULATOR_PID
-
-        # Return the test result
-        exit $TEST_RESULT
 
   publish:
     name: Publish to npm
