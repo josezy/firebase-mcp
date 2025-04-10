@@ -1,8 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import type { ServerOptions } from '@modelcontextprotocol/sdk/server/index.js';
 import { ListToolsRequestSchema, CallToolRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 import type { App } from 'firebase-admin/app';
-import type { Firestore } from 'firebase-admin/firestore';
 
 // Create mock for Server
 const createServerMock = () => ({
