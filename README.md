@@ -18,9 +18,18 @@ The [Model Context Protocol (MCP)](https://github.com/modelcontextprotocol) is a
 
 The server exposes Firebase services through MCP tools, making them accessible to LLM clients including [Claude Desktop](https://claude.ai/download), [Cursor](https://www.cursor.com/), [Roo Code](https://github.com/RooVetGit/Roo-Code), and [Cline](https://cline.bot/), while handling authentication and connection management.
 
-## 🔥 New in v1.3.0: Collection Group Queries
+## 🔥 New in v1.3.3: Storage Upload Features
 
-Firebase MCP now supports querying sub-collections (collection groups) in Firestore! This allows you to query across all sub-collections with the same name, regardless of their parent document - making it easy to search across your entire database hierarchy with a single query. Perfect for cross-document searches, activity feeds, and unified dashboards.
+Firebase MCP now supports direct file uploads to Firebase Storage! The new version introduces two powerful tools:
+
+- **`storage_upload`**: Upload files directly from text or base64 content with automatic content type detection
+- **`storage_upload_from_url`**: Import files from external URLs with a single command
+
+Both tools include user-friendly response formatting to display file information and download links in a clean, readable format.
+
+## 🔍 Also Available: Collection Group Queries
+
+Firebase MCP supports querying sub-collections (collection groups) in Firestore! This allows you to query across all sub-collections with the same name, regardless of their parent document - making it easy to search across your entire database hierarchy with a single query. Perfect for cross-document searches, activity feeds, and unified dashboards.
 
 ## Setup
 
@@ -221,6 +230,66 @@ To make sure everything is working, simply prompt your client: `Please run throu
     filePath: string // Path to the file in storage
   }
   ```
+
+- `storage_upload`: Upload a file to Firebase Storage from content (text, base64, etc.)
+
+  ```typescript
+  {
+    filePath: string,                  // The destination path in Firebase Storage
+    content: string,                   // The file content (text or base64 encoded data)
+    contentType?: string,              // Optional MIME type. If not provided, it will be inferred
+    metadata?: Record<string, any>     // Optional additional metadata
+  }
+  ```
+
+- `storage_upload_from_url`: Upload a file to Firebase Storage from an external URL
+
+  ```typescript
+  {
+    filePath: string,                  // The destination path in Firebase Storage
+    url: string,                       // The source URL to download from
+    contentType?: string,              // Optional MIME type. If not provided, it will be inferred from response headers
+    metadata?: Record<string, any>     // Optional additional metadata
+  }
+  ```
+
+### Response Formatting for MCP Clients
+
+When displaying responses from the Firebase MCP server, clients should format the responses in a user-friendly way. This is especially important for storage operations where users benefit from seeing file information in a structured format with clickable links.
+
+#### Example: Formatting Storage Upload Responses
+
+Raw response from `storage_upload` or `storage_upload_from_url`:
+```json
+{
+  "name": "example.txt",
+  "size": "1024",
+  "contentType": "text/plain",
+  "updated": "2025-04-10T22:37:10.290Z",
+  "downloadUrl": "https://storage.googleapis.com/bucket/example.txt?token..."
+}
+```
+
+Recommended client formatting:
+```markdown
+## File Successfully Uploaded! 📁
+
+Your file has been uploaded to Firebase Storage:
+
+**File Details:**
+- **Name:** example.txt
+- **Size:** 1024 bytes
+- **Type:** text/plain
+- **Last Updated:** April 10, 2025 at 22:37:10 UTC
+
+**[Click here to download your file](https://storage.googleapis.com/bucket/example.txt?token...)**
+```
+
+This formatting provides a better user experience by:
+1. Clearly indicating success with a descriptive heading
+2. Organizing file details in an easy-to-read format
+3. Providing a clickable download link
+4. Using appropriate formatting and emoji for visual appeal
 
 ## Development
 

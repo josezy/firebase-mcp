@@ -82,7 +82,7 @@ class FirebaseMcpServer {
     this.server = new Server(
       {
         name: 'firebase-mcp',
-        version: '0.1.0',
+        version: '1.3.3',
       },
       {
         capabilities: {
@@ -320,6 +320,10 @@ class FirebaseMcpServer {
             },
             required: ['filePath', 'content'],
           },
+          responseFormatting: {
+            template: '## File Successfully Uploaded! 📁\n\nYour file has been uploaded to Firebase Storage:\n\n**File Details:**\n- **Name:** {{name}}\n- **Size:** {{size}} bytes\n- **Type:** {{contentType}}\n- **Last Updated:** {{updated}}\n\n**[Click here to download your file]({{downloadUrl}})**',
+            fields: ['name', 'size', 'contentType', 'updated', 'downloadUrl']
+          },
         },
         {
           name: 'storage_upload_from_url',
@@ -345,6 +349,10 @@ class FirebaseMcpServer {
               },
             },
             required: ['filePath', 'url'],
+          },
+          responseFormatting: {
+            template: '## File Successfully Uploaded from URL! 📁\n\nYour file has been uploaded to Firebase Storage:\n\n**File Details:**\n- **Name:** {{name}}\n- **Size:** {{size}} bytes\n- **Type:** {{contentType}}\n- **Last Updated:** {{updated}}\n- **Source URL:** {{sourceUrl}}\n\n**[Click here to download your file]({{downloadUrl}})**',
+            fields: ['name', 'size', 'contentType', 'updated', 'downloadUrl', 'sourceUrl']
           },
         },
         {
