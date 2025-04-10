@@ -2,11 +2,11 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { logger } from '../logger';
 
 describe('Logger', () => {
-  let stderrWrite: ReturnType<typeof vi.fn<[string | Uint8Array], boolean>>;
+  let stderrWrite: ReturnType<typeof vi.fn>;
   const originalStderrWrite = process.stderr.write;
 
   beforeEach(() => {
-    stderrWrite = vi.fn<[string | Uint8Array], boolean>().mockReturnValue(true);
+    stderrWrite = vi.fn().mockReturnValue(true);
     process.stderr.write = stderrWrite;
   });
 
@@ -77,4 +77,4 @@ describe('Logger', () => {
       expect(stderrWrite).toHaveBeenCalledWith(JSON.stringify([args], null, 2) + '\n');
     });
   });
-}); 
+});

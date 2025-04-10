@@ -1,16 +1,16 @@
 /**
  * Firebase Authentication Client
- * 
+ *
  * This module provides functions for interacting with Firebase Authentication.
  * It includes operations for user management and verification.
- * 
+ *
  * @module firebase-mcp/auth
  */
 
 import * as admin from 'firebase-admin';
 
 interface AuthResponse {
-  content: Array<{ type: string, text: string }>;
+  content: Array<{ type: string; text: string }>;
   isError?: boolean;
 }
 
@@ -18,15 +18,15 @@ interface AuthResponse {
  * Retrieves user information from Firebase Authentication using either a user ID or email address.
  * The function automatically detects whether the identifier is an email address (contains '@')
  * or a user ID and uses the appropriate Firebase Auth method.
- * 
+ *
  * @param {string} identifier - The user ID or email address to look up
  * @returns {Promise<AuthResponse>} A formatted response object containing the user information
  * @throws {Error} If the user cannot be found or if there's an authentication error
- * 
+ *
  * @example
  * // Get user by email
  * const userInfo = await getUserByIdOrEmail('user@example.com');
- * 
+ *
  * @example
  * // Get user by ID
  * const userInfo = await getUserByIdOrEmail('abc123xyz456');
@@ -44,12 +44,12 @@ export async function getUserByIdOrEmail(identifier: string): Promise<AuthRespon
     }
 
     return {
-      content: [{ type: 'json', text: JSON.stringify(user) }]
+      content: [{ type: 'json', text: JSON.stringify(user) }],
     };
-  } catch (error) {
+  } catch (_error) {
     return {
       content: [{ type: 'error', text: `User not found: ${identifier}` }],
-      isError: true
+      isError: true,
     };
   }
 }

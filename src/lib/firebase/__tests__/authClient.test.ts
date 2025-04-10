@@ -6,7 +6,7 @@ import { vi } from 'vitest';
 
 /**
  * Authentication Client Tests
- * 
+ *
  * These tests verify the functionality of the Firebase Authentication client operations.
  * Tests run against the Firebase emulator when available.
  */
@@ -24,11 +24,11 @@ async function ensureTestUser() {
       testId = user.uid;
       logger.debug('Test user already exists:', testEmail);
       return;
-    } catch (error) {
+    } catch (_error) {
       // User doesn't exist, create it
       const user = await admin.auth().createUser({
         email: testEmail,
-        emailVerified: true
+        emailVerified: true,
       });
       testId = user.uid;
       logger.debug('Test user created/verified:', testEmail);
@@ -45,7 +45,7 @@ async function deleteTestUser() {
       await admin.auth().deleteUser(testId);
       logger.debug('Test user deleted:', testEmail);
     }
-  } catch (error) {
+  } catch (_error) {
     // Ignore errors if user doesn't exist
   }
 }
@@ -57,7 +57,7 @@ beforeAll(async () => {
     process.env.FIREBASE_AUTH_EMULATOR_HOST = 'localhost:9099';
     logger.debug('Using Firebase Auth emulator');
   }
-  
+
   await ensureTestUser();
 });
 
@@ -71,11 +71,11 @@ describe('Authentication Client', () => {
     // Test getting user by UID
     it('should return user data when a valid UID is provided', async () => {
       const result = await getUserByIdOrEmail(testId);
-      
+
       // Verify the response format
       expect(result.content).toBeDefined();
       expect(result.content.length).toBe(1);
-      
+
       // In emulator mode, check might be flaky due to auth timing issues
       if (process.env.USE_FIREBASE_EMULATOR === 'true') {
         console.log('[TEST DEBUG] Auth test in emulator mode, skipping isError check');
@@ -83,11 +83,11 @@ describe('Authentication Client', () => {
         // Only check for errors in non-emulator mode
         expect(result.isError).not.toBe(true);
       }
-      
+
       try {
         // Parse the response
         const responseData = JSON.parse(result.content[0].text);
-        
+
         // Verify user data structure
         expect(responseData.uid).toBe(testId);
         expect(responseData.email).toBe(testEmail);
@@ -95,7 +95,9 @@ describe('Authentication Client', () => {
       } catch (error) {
         // In emulator mode, we'll skip this test if it fails due to auth issues
         if (process.env.USE_FIREBASE_EMULATOR === 'true' && result.isError) {
-          console.log('[TEST DEBUG] Skipping user lookup test in emulator mode due to known issues');
+          console.log(
+            '[TEST DEBUG] Skipping user lookup test in emulator mode due to known issues'
+          );
           return;
         }
         throw error;
@@ -105,24 +107,24 @@ describe('Authentication Client', () => {
     // Test getting user by email
     it('should return user data when a valid email is provided', async () => {
       const result = await getUserByIdOrEmail(testEmail);
-      
+
       // Verify the response format
       expect(result.content).toBeDefined();
       expect(result.content.length).toBe(1);
-      
+
       // In emulator mode, sometimes the email lookup returns an error
       // Log the result for debugging
       logger.debug('getUserByEmail result:', result);
-      
+
       // Skip the isError check in emulator mode
       if (process.env.USE_FIREBASE_EMULATOR !== 'true') {
         expect(result.isError).not.toBe(true);
       }
-      
+
       try {
         // Parse the response
         const responseData = JSON.parse(result.content[0].text);
-        
+
         // Verify user data structure
         expect(responseData.uid).toBe(testId);
         expect(responseData.email).toBe(testEmail);
@@ -140,7 +142,7 @@ describe('Authentication Client', () => {
     // Test error handling for non-existent user ID
     it('should handle non-existent user ID gracefully', async () => {
       const result = await getUserByIdOrEmail('non-existent-id');
-      
+
       // Verify error response
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toBe('User not found: non-existent-id');
@@ -149,7 +151,7 @@ describe('Authentication Client', () => {
     // Test error handling for non-existent email
     it('should handle non-existent email gracefully', async () => {
       const result = await getUserByIdOrEmail('nonexistent@example.com');
-      
+
       // Verify error response
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toBe('User not found: nonexistent@example.com');
@@ -164,7 +166,7 @@ describe('Authentication Client', () => {
 
       try {
         const result = await getUserByIdOrEmail(testId);
-        
+
         // Verify error response
         expect(result.isError).toBe(true);
         expect(result.content[0].text).toBe('User not found: ' + testId);
