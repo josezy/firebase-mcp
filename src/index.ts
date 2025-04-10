@@ -296,6 +296,58 @@ class FirebaseMcpServer {
           },
         },
         {
+          name: 'storage_upload',
+          description: 'Upload a file to Firebase Storage from content (text, base64, etc.)',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              filePath: {
+                type: 'string',
+                description: 'The destination path in Firebase Storage',
+              },
+              content: {
+                type: 'string',
+                description: 'The file content (text or base64 encoded data)',
+              },
+              contentType: {
+                type: 'string',
+                description: 'Optional MIME type. If not provided, it will be inferred',
+              },
+              metadata: {
+                type: 'object',
+                description: 'Optional additional metadata',
+              },
+            },
+            required: ['filePath', 'content'],
+          },
+        },
+        {
+          name: 'storage_upload_from_url',
+          description: 'Upload a file to Firebase Storage from an external URL',
+          inputSchema: {
+            type: 'object',
+            properties: {
+              filePath: {
+                type: 'string',
+                description: 'The destination path in Firebase Storage',
+              },
+              url: {
+                type: 'string',
+                description: 'The source URL to download from',
+              },
+              contentType: {
+                type: 'string',
+                description: 'Optional MIME type. If not provided, it will be inferred',
+              },
+              metadata: {
+                type: 'object',
+                description: 'Optional additional metadata',
+              },
+            },
+            required: ['filePath', 'url'],
+          },
+        },
+        {
           name: 'firestore_list_collections',
           description: 'List root collections in Firestore',
           inputSchema: {
@@ -781,6 +833,138 @@ class FirebaseMcpServer {
                     type: 'text',
                     text: JSON.stringify({
                       error: 'Failed to get file info',
+                      details: error instanceof Error ? error.message : 'Unknown error',
+                    }),
+                  },
+                ],
+              };
+            }
+          }
+
+          case 'storage_upload': {
+            const { filePath, content, contentType, metadata } = args;
+
+            try {
+              logger.debug(`Uploading file to: ${filePath}`);
+              const storageClient = await import('./lib/firebase/storageClient.js');
+              const uploadFile = storageClient.uploadFile;
+              const result = await uploadFile(
+                filePath as string,
+                content as string,
+                contentType as string | undefined,
+                metadata as Record<string, any> | undefined
+              );
+
+              // Check if there's an error
+              if (result.isError) {
+                return {
+                  content: [
+                    {
+                      type: 'text',
+                      text: result.content[0].text,
+                    },
+                  ],
+                  error: true,
+                };
+              }
+
+              // Extract the file info from the JSON response
+              try {
+                const fileInfo = JSON.parse(result.content[0].text);
+
+                return {
+                  content: [
+                    {
+                      type: 'text',
+                      text: JSON.stringify(fileInfo, null, 2),
+                    },
+                  ],
+                };
+              } catch (error) {
+                // If parsing fails, return the original text
+                return {
+                  content: [
+                    {
+                      type: 'text',
+                      text: result.content[0].text,
+                    },
+                  ],
+                };
+              }
+            } catch (error) {
+              logger.error('Failed to upload file', error);
+              return {
+                content: [
+                  {
+                    type: 'text',
+                    text: JSON.stringify({
+                      error: 'Failed to upload file',
+                      details: error instanceof Error ? error.message : 'Unknown error',
+                    }),
+                  },
+                ],
+              };
+            }
+          }
+
+          case 'storage_upload_from_url': {
+            const { filePath, url, contentType, metadata } = args;
+
+            try {
+              logger.debug(`Uploading file from URL: ${url} to: ${filePath}`);
+              const storageClient = await import('./lib/firebase/storageClient.js');
+              const uploadFileFromUrl = storageClient.uploadFileFromUrl;
+              const result = await uploadFileFromUrl(
+                filePath as string,
+                url as string,
+                contentType as string | undefined,
+                metadata as Record<string, any> | undefined
+              );
+
+              // Check if there's an error
+              if (result.isError) {
+                return {
+                  content: [
+                    {
+                      type: 'text',
+                      text: result.content[0].text,
+                    },
+                  ],
+                  error: true,
+                };
+              }
+
+              // Extract the file info from the JSON response
+              try {
+                const fileInfo = JSON.parse(result.content[0].text);
+
+                return {
+                  content: [
+                    {
+                      type: 'text',
+                      text: JSON.stringify(fileInfo, null, 2),
+                    },
+                  ],
+                };
+              } catch (error) {
+                // If parsing fails, return the original text
+                return {
+                  content: [
+                    {
+                      type: 'text',
+                      text: result.content[0].text,
+                    },
+                  ],
+                };
+              }
+            } catch (error) {
+              logger.error('Failed to upload file from URL', error);
+              return {
+                content: [
+                  {
+                    type: 'text',
+                    text: JSON.stringify({
+                      error: 'Failed to upload file from URL',
                       details: error instanceof Error ? error.message : 'Unknown error',
                     }),
                   },

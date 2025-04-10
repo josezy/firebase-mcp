@@ -10,6 +10,7 @@
  */
 
 import * as admin from 'firebase-admin';
+import axios from 'axios';
 import { getProjectId } from './firebaseConfig';
 
 //const storage = admin.storage().bucket();
@@ -104,7 +105,7 @@ export async function getBucket() {
  * Lists files and directories in a specified path in Firebase Storage.
  * Results are paginated and include download URLs for files and console URLs for directories.
  *
- * @param {string} [path] - The path to list files from (e.g., 'images/' or 'documents/2023/')
+ * @param {string} [directoryPath] - The path to list files from (e.g., 'images/' or 'documents/2023/')
  *                          If not provided, lists files from the root directory
  * @param {number} [pageSize=10] - Number of items to return per page
  * @param {string} [pageToken] - Token for pagination to get the next page of results
@@ -151,7 +152,7 @@ export async function listDirectoryFiles(
     }));
 
     return {
-      content: [{ type: 'json', text: JSON.stringify({ files: fileList, nextPageToken }) }],
+      content: [{ type: 'text', text: JSON.stringify({ files: fileList, nextPageToken }) }],
     };
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -209,12 +210,220 @@ export async function getFileInfo(filePath: string): Promise<StorageResponse> {
     };
 
     return {
-      content: [{ type: 'json', text: JSON.stringify(fileInfo) }],
+      content: [{ type: 'text', text: JSON.stringify(fileInfo) }],
     };
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     return {
       content: [{ type: 'error', text: `Error getting file info: ${errorMessage}` }],
+      isError: true,
+    };
+  }
+}
+
+/**
+ * Uploads a file to Firebase Storage from content (text, base64, etc.)
+ *
+ * @param {string} filePath - The destination path in Firebase Storage
+ * @param {string} content - The file content (text or base64 encoded data)
+ * @param {string} [contentType] - Optional MIME type. If not provided, it will be inferred
+ * @param {object} [metadata] - Optional additional metadata
+ * @returns {Promise<StorageResponse>} MCP-formatted response with file info
+ * @throws {Error} If Firebase is not initialized or if there's a Storage error
+ *
+ * @example
+ * // Upload a text file
+ * const result = await uploadFile('logs/info.txt', 'Log content here', 'text/plain');
+ *
+ * @example
+ * // Upload from base64
+ * const result = await uploadFile('images/logo.png', 'data:image/png;base64,iVBORw0...');
+ */
+export async function uploadFile(
+  filePath: string,
+  content: string,
+  contentType?: string,
+  metadata?: Record<string, any>
+): Promise<StorageResponse> {
+  try {
+    const bucket = await getBucket();
+    if (!bucket) {
+      return {
+        content: [{ type: 'error', text: 'Storage bucket not available' }],
+        isError: true,
+      };
+    }
+
+    let buffer: Buffer;
+    let detectedContentType = contentType;
+
+    // Handle base64 data URLs
+    if (content.startsWith('data:')) {
+      const matches = content.match(/^data:([A-Za-z-+/]+);base64,(.+)$/);
+
+      if (matches && matches.length === 3) {
+        // If content type not provided, use the one from data URL
+        if (!detectedContentType) {
+          detectedContentType = matches[1];
+        }
+
+        try {
+          // Extract base64 data and convert to buffer
+          buffer = Buffer.from(matches[2], 'base64');
+        } catch (error) {
+          return {
+            content: [{ type: 'error', text: 'Invalid base64 data' }],
+            isError: true,
+          };
+        }
+      } else {
+        return {
+          content: [{ type: 'error', text: 'Invalid data URL format' }],
+          isError: true,
+        };
+      }
+    } else {
+      // Treat as plain text if not a data URL
+      buffer = Buffer.from(content);
+
+      // Default to text/plain if content type not provided
+      if (!detectedContentType) {
+        detectedContentType = 'text/plain';
+      }
+    }
+
+    // Create file reference
+    const file = bucket.file(filePath);
+
+    // Prepare upload options
+    const options = {
+      metadata: {
+        contentType: detectedContentType,
+        metadata: metadata || {},
+      },
+    };
+
+    // Upload file
+    await file.save(buffer, options);
+
+    // Get file info including download URL
+    const [fileMetadata] = await file.getMetadata();
+    const [url] = await file.getSignedUrl({
+      action: 'read',
+      expires: Date.now() + 15 * 60 * 1000, // URL expires in 15 minutes
+    });
+
+    const fileInfo = {
+      name: fileMetadata.name,
+      size: fileMetadata.size,
+      contentType: fileMetadata.contentType,
+      updated: fileMetadata.updated,
+      downloadUrl: url,
+    };
+
+    return {
+      content: [{ type: 'text', text: JSON.stringify(fileInfo) }],
+    };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    return {
+      content: [{ type: 'error', text: `Error uploading file: ${errorMessage}` }],
+      isError: true,
+    };
+  }
+}
+
+/**
+ * Uploads a file to Firebase Storage from an external URL
+ *
+ * @param {string} filePath - The destination path in Firebase Storage
+ * @param {string} url - The source URL to download from
+ * @param {string} [contentType] - Optional MIME type. If not provided, it will be inferred from response headers
+ * @param {object} [metadata] - Optional additional metadata
+ * @returns {Promise<StorageResponse>} MCP-formatted response with file info
+ * @throws {Error} If Firebase is not initialized, if the URL is invalid, or if there's a Storage error
+ *
+ * @example
+ * // Upload a file from URL
+ * const result = await uploadFileFromUrl('documents/report.pdf', 'https://example.com/report.pdf');
+ */
+export async function uploadFileFromUrl(
+  filePath: string,
+  url: string,
+  contentType?: string,
+  metadata?: Record<string, any>
+): Promise<StorageResponse> {
+  try {
+    const bucket = await getBucket();
+    if (!bucket) {
+      return {
+        content: [{ type: 'error', text: 'Storage bucket not available' }],
+        isError: true,
+      };
+    }
+
+    // Fetch file from URL
+    try {
+      const response = await axios.get(url, {
+        responseType: 'arraybuffer',
+        headers: {
+          'Accept': 'application/octet-stream',
+        },
+      });
+
+      // Use provided content type or get from response headers
+      const detectedContentType = contentType || response.headers['content-type'] || 'application/octet-stream';
+
+      // Create buffer from response data
+      const buffer = Buffer.from(response.data);
+
+      // Create file reference
+      const file = bucket.file(filePath);
+
+      // Prepare upload options
+      const options = {
+        metadata: {
+          contentType: detectedContentType,
+          metadata: {
+            ...metadata,
+            sourceUrl: url,
+          },
+        },
+      };
+
+      // Upload file
+      await file.save(buffer, options);
+
+      // Get file info including download URL
+      const [fileMetadata] = await file.getMetadata();
+      const [downloadUrl] = await file.getSignedUrl({
+        action: 'read',
+        expires: Date.now() + 15 * 60 * 1000, // URL expires in 15 minutes
+      });
+
+      const fileInfo = {
+        name: fileMetadata.name,
+        size: fileMetadata.size,
+        contentType: fileMetadata.contentType,
+        updated: fileMetadata.updated,
+        downloadUrl,
+        sourceUrl: url,
+      };
+
+      return {
+        content: [{ type: 'text', text: JSON.stringify(fileInfo) }],
+      };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      return {
+        content: [{ type: 'error', text: `Error fetching or processing URL: ${errorMessage}` }],
+        isError: true,
+      };
+    }
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    return {
+      content: [{ type: 'error', text: `Error uploading file from URL: ${errorMessage}` }],
       isError: true,
     };
   }
