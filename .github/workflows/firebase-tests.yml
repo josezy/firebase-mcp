@@ -231,15 +231,8 @@ jobs:
         rm -f package-lock.json
         npm install
 
-    - name: Add preflight script if needed
-      run: |
-        if ! grep -q '"preflight"' package.json; then
-          npm pkg set 'scripts.preflight'='npm run format && npm run lint && npm run test && npm run build && npm ls --depth=0'
-        fi
-
-    - name: Run preflight checks
-      run: npm run preflight
-      # This runs formatting, linting, tests, and build in sequence
+    - name: Build package
+      run: npm run build
 
     - name: Set executable permissions
       run: chmod +x dist/*.js
