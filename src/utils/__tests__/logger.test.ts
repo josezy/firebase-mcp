@@ -77,4 +77,4 @@ describe('Logger', () => {
       expect(stderrWrite).toHaveBeenCalledWith(JSON.stringify([args], null, 2) + '\n');
     });
   });
-}); 
+});

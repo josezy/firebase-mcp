@@ -1,43 +1,47 @@
 /**
  * Firebase Firestore Client
- * 
+ *
  * This module provides functions for interacting with Firebase Firestore database.
  * It includes operations for listing collections, querying documents, and performing CRUD operations.
  * All functions return data in a format compatible with the MCP protocol response structure.
- * 
+ *
  * @module firebase-mcp/firestore
  */
 
 import { Query, Timestamp } from 'firebase-admin/firestore';
-import {db, getProjectId} from './firebaseConfig';
+import { db, getProjectId } from './firebaseConfig';
 import fs from 'fs';
 import path from 'path';
 import * as admin from 'firebase-admin';
 
 interface FirestoreResponse {
-  content: Array<{ type: string, text: string }>;
+  content: Array<{ type: string; text: string }>;
   isError?: boolean;
 }
 
 /**
  * Lists collections in Firestore, either at the root level or under a specific document.
  * Results are paginated and include links to the Firebase console.
- * 
+ *
  * @param {string} [documentPath] - Optional path to a document to list subcollections
  * @param {number} [limit=20] - Maximum number of collections to return
  * @param {string} [pageToken] - Token for pagination (collection ID to start after)
  * @returns {Promise<Object>} MCP-formatted response with collection data
  * @throws {Error} If Firebase is not initialized or if there's a Firestore error
- * 
+ *
  * @example
  * // List root collections
  * const rootCollections = await list_collections();
- * 
+ *
  * @example
  * // List subcollections of a document
  * const subCollections = await list_collections('users/user123');
  */
-export async function list_collections(documentPath?: string, limit: number = 20, pageToken?: string): Promise<FirestoreResponse> {
+export async function list_collections(
+  documentPath?: string,
+  limit: number = 20,
+  pageToken?: string
+): Promise<FirestoreResponse> {
   try {
     const collections = documentPath
       ? await admin.firestore().doc(documentPath).listCollections()
@@ -47,7 +51,7 @@ export async function list_collections(documentPath?: string, limit: number = 20
     if (!serviceAccountPath) {
       return {
         content: [{ type: 'error', text: 'Service account path not set' }],
-        isError: true
+        isError: true,
       };
     }
 
@@ -55,7 +59,7 @@ export async function list_collections(documentPath?: string, limit: number = 20
     if (!projectId) {
       return {
         content: [{ type: 'error', text: 'Could not determine project ID' }],
-        isError: true
+        isError: true,
       };
     }
 
@@ -64,18 +68,18 @@ export async function list_collections(documentPath?: string, limit: number = 20
       return {
         id: collection.id,
         path: collection.path,
-        url: collectionUrl
+        url: collectionUrl,
       };
     });
 
     return {
-      content: [{ type: 'json', text: JSON.stringify({ collections: collectionList }) }]
+      content: [{ type: 'json', text: JSON.stringify({ collections: collectionList }) }],
     };
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     return {
       content: [{ type: 'error', text: errorMessage }],
-      isError: true
+      isError: true,
     };
   }
 }
@@ -83,7 +87,7 @@ export async function list_collections(documentPath?: string, limit: number = 20
 /**
  * Converts Firestore Timestamp objects to ISO string format for JSON serialization.
  * This is a helper function used internally by other functions.
- * 
+ *
  * @param {any} data - The data object containing potential Timestamp fields
  * @returns {any} The same data object with Timestamps converted to ISO strings
  * @private
@@ -100,18 +104,18 @@ function convertTimestampsToISO(data: any) {
 /**
  * Lists documents in a Firestore collection with optional filtering and pagination.
  * Results include document data, IDs, and links to the Firebase console.
- * 
+ *
  * @param {string} collection - The collection path to query
  * @param {Array<Object>} [filters=[]] - Array of filter conditions with field, operator, and value
  * @param {number} [limit=20] - Maximum number of documents to return
  * @param {string} [pageToken] - Token for pagination (document ID to start after)
  * @returns {Promise<Object>} MCP-formatted response with document data
  * @throws {Error} If Firebase is not initialized or if there's a Firestore error
- * 
+ *
  * @example
  * // List all documents in a collection
  * const allDocs = await listDocuments('users');
- * 
+ *
  * @example
  * // List documents with filtering
  * const filteredDocs = await listDocuments('users', [
@@ -121,7 +125,7 @@ function convertTimestampsToISO(data: any) {
  */
 export async function listDocuments(
   collection: string,
-  filters?: Array<{ field: string, operator: FirebaseFirestore.WhereFilterOp, value: any }>,
+  filters?: Array<{ field: string; operator: FirebaseFirestore.WhereFilterOp; value: any }>,
   limit: number = 20,
   pageToken?: string
 ): Promise<FirestoreResponse> {
@@ -150,7 +154,7 @@ export async function listDocuments(
     if (!serviceAccountPath) {
       return {
         content: [{ type: 'error', text: 'Service account path not set' }],
-        isError: true
+        isError: true,
       };
     }
 
@@ -158,7 +162,7 @@ export async function listDocuments(
     if (!projectId) {
       return {
         content: [{ type: 'error', text: 'Could not determine project ID' }],
-        isError: true
+        isError: true,
       };
     }
 
@@ -167,7 +171,7 @@ export async function listDocuments(
       return {
         id: doc.id,
         data: doc.data(),
-        url: consoleUrl
+        url: consoleUrl,
       };
     });
 
@@ -175,29 +179,29 @@ export async function listDocuments(
     const nextPageToken = lastVisible ? lastVisible.ref.path : undefined;
 
     return {
-      content: [{ type: 'json', text: JSON.stringify({ documents, nextPageToken }) }]
+      content: [{ type: 'json', text: JSON.stringify({ documents, nextPageToken }) }],
     };
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     return {
       content: [{ type: 'error', text: errorMessage }],
-      isError: true
+      isError: true,
     };
   }
 }
 
 /**
  * Adds a new document to a Firestore collection with auto-generated ID.
- * 
+ *
  * @param {string} collection - The collection path to add the document to
  * @param {any} data - The document data to add
  * @returns {Promise<Object>} MCP-formatted response with the new document ID and data
  * @throws {Error} If Firebase is not initialized or if there's a Firestore error
- * 
+ *
  * @example
  * // Add a new user document
- * const result = await addDocument('users', { 
- *   name: 'John Doe', 
+ * const result = await addDocument('users', {
+ *   name: 'John Doe',
  *   email: 'john@example.com',
  *   createdAt: new Date()
  * });
@@ -209,7 +213,7 @@ export async function addDocument(collection: string, data: object): Promise<Fir
     if (!serviceAccountPath) {
       return {
         content: [{ type: 'error', text: 'Service account path not set' }],
-        isError: true
+        isError: true,
       };
     }
 
@@ -217,32 +221,32 @@ export async function addDocument(collection: string, data: object): Promise<Fir
     if (!projectId) {
       return {
         content: [{ type: 'error', text: 'Could not determine project ID' }],
-        isError: true
+        isError: true,
       };
     }
 
     const consoleUrl = `https://console.firebase.google.com/project/${projectId}/firestore/data/${collection}/${docRef.id}`;
 
     return {
-      content: [{ type: 'json', text: JSON.stringify({ id: docRef.id, url: consoleUrl }) }]
+      content: [{ type: 'json', text: JSON.stringify({ id: docRef.id, url: consoleUrl }) }],
     };
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     return {
       content: [{ type: 'error', text: errorMessage }],
-      isError: true
+      isError: true,
     };
   }
 }
 
 /**
  * Retrieves a specific document from a Firestore collection by ID.
- * 
+ *
  * @param {string} collection - The collection path containing the document
  * @param {string} id - The document ID to retrieve
  * @returns {Promise<Object>} MCP-formatted response with the document data
  * @throws {Error} If Firebase is not initialized or if there's a Firestore error
- * 
+ *
  * @example
  * // Get a specific user document
  * const user = await getDocument('users', 'user123');
@@ -254,7 +258,7 @@ export async function getDocument(collection: string, id: string): Promise<Fires
     if (!serviceAccountPath) {
       return {
         content: [{ type: 'error', text: 'Service account path not set' }],
-        isError: true
+        isError: true,
       };
     }
 
@@ -262,55 +266,61 @@ export async function getDocument(collection: string, id: string): Promise<Fires
     if (!projectId) {
       return {
         content: [{ type: 'error', text: 'Could not determine project ID' }],
-        isError: true
+        isError: true,
       };
     }
 
     if (!doc.exists) {
       return {
         content: [{ type: 'error', text: `Document not found: ${id}` }],
-        isError: true
+        isError: true,
       };
     }
 
     const consoleUrl = `https://console.firebase.google.com/project/${projectId}/firestore/data/${collection}/${id}`;
 
     return {
-      content: [{ type: 'json', text: JSON.stringify({ id: doc.id, data: doc.data(), url: consoleUrl }) }]
+      content: [
+        { type: 'json', text: JSON.stringify({ id: doc.id, data: doc.data(), url: consoleUrl }) },
+      ],
     };
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     return {
       content: [{ type: 'error', text: errorMessage }],
-      isError: true
+      isError: true,
     };
   }
 }
 
 /**
  * Updates an existing document in a Firestore collection.
- * 
+ *
  * @param {string} collection - The collection path containing the document
  * @param {string} id - The document ID to update
  * @param {any} data - The document data to update (fields will be merged)
  * @returns {Promise<Object>} MCP-formatted response with the updated document data
  * @throws {Error} If Firebase is not initialized or if there's a Firestore error
- * 
+ *
  * @example
  * // Update a user's status
- * const result = await updateDocument('users', 'user123', { 
+ * const result = await updateDocument('users', 'user123', {
  *   status: 'inactive',
  *   lastUpdated: new Date()
  * });
  */
-export async function updateDocument(collection: string, id: string, data: object): Promise<FirestoreResponse> {
+export async function updateDocument(
+  collection: string,
+  id: string,
+  data: object
+): Promise<FirestoreResponse> {
   try {
     await admin.firestore().collection(collection).doc(id).update(data);
     const serviceAccountPath = process.env.SERVICE_ACCOUNT_KEY_PATH;
     if (!serviceAccountPath) {
       return {
         content: [{ type: 'error', text: 'Service account path not set' }],
-        isError: true
+        isError: true,
       };
     }
 
@@ -318,32 +328,32 @@ export async function updateDocument(collection: string, id: string, data: objec
     if (!projectId) {
       return {
         content: [{ type: 'error', text: 'Could not determine project ID' }],
-        isError: true
+        isError: true,
       };
     }
 
     const consoleUrl = `https://console.firebase.google.com/project/${projectId}/firestore/data/${collection}/${id}`;
 
     return {
-      content: [{ type: 'json', text: JSON.stringify({ success: true, url: consoleUrl }) }]
+      content: [{ type: 'json', text: JSON.stringify({ success: true, url: consoleUrl }) }],
     };
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     return {
       content: [{ type: 'error', text: errorMessage }],
-      isError: true
+      isError: true,
     };
   }
 }
 
 /**
  * Deletes a document from a Firestore collection.
- * 
+ *
  * @param {string} collection - The collection path containing the document
  * @param {string} id - The document ID to delete
  * @returns {Promise<Object>} MCP-formatted response confirming deletion
  * @throws {Error} If Firebase is not initialized or if there's a Firestore error
- * 
+ *
  * @example
  * // Delete a user document
  * const result = await deleteDocument('users', 'user123');
@@ -352,23 +362,23 @@ export async function deleteDocument(collection: string, id: string): Promise<Fi
   try {
     const docRef = admin.firestore().collection(collection).doc(id);
     const doc = await docRef.get();
-    
+
     if (!doc.exists) {
       return {
         content: [{ type: 'error', text: 'no entity to delete' }],
-        isError: true
+        isError: true,
       };
     }
 
     await docRef.delete();
     return {
-      content: [{ type: 'json', text: JSON.stringify({ success: true }) }]
+      content: [{ type: 'json', text: JSON.stringify({ success: true }) }],
     };
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     return {
       content: [{ type: 'error', text: errorMessage }],
-      isError: true
+      isError: true,
     };
   }
 }
@@ -376,7 +386,7 @@ export async function deleteDocument(collection: string, id: string): Promise<Fi
 /**
  * Queries across all subcollections with the same name regardless of their parent document.
  * This is useful for searching data across multiple parent documents.
- * 
+ *
  * @param {string} collectionId - The collection ID to query (without parent path)
  * @param {Array<Object>} [filters=[]] - Array of filter conditions with field, operator, and value
  * @param {Array<Object>} [orderBy=[]] - Array of fields to order results by
@@ -384,11 +394,11 @@ export async function deleteDocument(collection: string, id: string): Promise<Fi
  * @param {string} [pageToken] - Token for pagination (document path to start after)
  * @returns {Promise<Object>} MCP-formatted response with document data
  * @throws {Error} If Firebase is not initialized or if there's a Firestore error
- * 
+ *
  * @example
  * // Query across all 'comments' subcollections
  * const allComments = await queryCollectionGroup('comments');
- * 
+ *
  * @example
  * // Query with filtering
  * const filteredComments = await queryCollectionGroup('comments', [
@@ -397,8 +407,8 @@ export async function deleteDocument(collection: string, id: string): Promise<Fi
  */
 export async function queryCollectionGroup(
   collectionId: string,
-  filters?: Array<{ field: string, operator: FirebaseFirestore.WhereFilterOp, value: any }>,
-  orderBy?: Array<{ field: string, direction?: 'asc' | 'desc' }>,
+  filters?: Array<{ field: string; operator: FirebaseFirestore.WhereFilterOp; value: any }>,
+  orderBy?: Array<{ field: string; direction?: 'asc' | 'desc' }>,
   limit: number = 20,
   pageToken?: string
 ): Promise<FirestoreResponse> {
@@ -430,21 +440,26 @@ export async function queryCollectionGroup(
         }
       } catch (error) {
         return {
-          content: [{ type: 'error', text: `Invalid pagination token: ${error instanceof Error ? error.message : 'Unknown error'}` }],
-          isError: true
+          content: [
+            {
+              type: 'error',
+              text: `Invalid pagination token: ${error instanceof Error ? error.message : 'Unknown error'}`,
+            },
+          ],
+          isError: true,
         };
       }
     }
-    
+
     // Apply limit
     query = query.limit(limit);
-    
+
     const snapshot = await query.get();
     const serviceAccountPath = process.env.SERVICE_ACCOUNT_KEY_PATH;
     if (!serviceAccountPath) {
       return {
         content: [{ type: 'error', text: 'Service account path not set' }],
-        isError: true
+        isError: true,
       };
     }
 
@@ -452,7 +467,7 @@ export async function queryCollectionGroup(
     if (!projectId) {
       return {
         content: [{ type: 'error', text: 'Could not determine project ID' }],
-        isError: true
+        isError: true,
       };
     }
 
@@ -460,34 +475,34 @@ export async function queryCollectionGroup(
       // For collection groups, we need to use the full path for the URL
       const fullPath = doc.ref.path;
       const consoleUrl = `https://console.firebase.google.com/project/${projectId}/firestore/data/${fullPath}`;
-      
+
       // Handle Timestamp and other Firestore types
       const data = convertTimestampsToISO(doc.data());
-      
+
       return {
         id: doc.id,
         path: fullPath,
         data,
-        url: consoleUrl
+        url: consoleUrl,
       };
     });
 
     // Get the last document for pagination
     const lastVisible = snapshot.docs[snapshot.docs.length - 1];
     const nextPageToken = lastVisible ? lastVisible.ref.path : undefined;
-    
+
     // Ensure we're creating valid JSON by serializing and handling special characters
     const responseObj = { documents, nextPageToken };
     const jsonText = JSON.stringify(responseObj);
-    
+
     return {
-      content: [{ type: 'json', text: jsonText }]
+      content: [{ type: 'json', text: jsonText }],
     };
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     return {
       content: [{ type: 'error', text: errorMessage }],
-      isError: true
+      isError: true,
     };
   }
 }

@@ -2,17 +2,22 @@
 
 /**
  * Firebase MCP Server
- * 
+ *
  * This server implements the Model Context Protocol (MCP) for Firebase services.
  * It provides tools for interacting with Firebase Authentication, Firestore, and Storage
  * through a standardized interface that can be used by AI assistants and other MCP clients.
- * 
+ *
  * @module firebase-mcp
  */
 
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import { CallToolRequestSchema, ListToolsRequestSchema, ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
+import {
+  CallToolRequestSchema,
+  ListToolsRequestSchema,
+  ErrorCode,
+  McpError,
+} from '@modelcontextprotocol/sdk/types.js';
 import * as admin from 'firebase-admin';
 import { logger } from './utils/logger.js';
 
@@ -42,7 +47,7 @@ function initializeFirebase() {
 
     return admin.initializeApp({
       credential: admin.credential.cert(serviceAccount),
-      storageBucket: storageBucket
+      storageBucket: storageBucket,
     });
   } catch (error) {
     logger.error('Failed to initialize Firebase', error);
@@ -54,7 +59,7 @@ function initializeFirebase() {
 const app = initializeFirebase();
 
 interface McpResponse {
-  content: Array<{ type: string, text: string }>;
+  content: Array<{ type: string; text: string }>;
   isError?: boolean;
 }
 
@@ -73,12 +78,12 @@ class FirebaseMcpServer {
     this.server = new Server(
       {
         name: 'firebase-mcp',
-        version: '0.1.0'
+        version: '0.1.0',
       },
       {
         capabilities: {
-          tools: {}
-        }
+          tools: {},
+        },
       }
     );
 
@@ -109,15 +114,15 @@ class FirebaseMcpServer {
             properties: {
               collection: {
                 type: 'string',
-                description: 'Collection name'
+                description: 'Collection name',
               },
               data: {
                 type: 'object',
-                description: 'Document data'
-              }
+                description: 'Document data',
+              },
             },
-            required: ['collection', 'data']
-          }
+            required: ['collection', 'data'],
+          },
         },
         {
           name: 'firestore_list_documents',
@@ -127,7 +132,7 @@ class FirebaseMcpServer {
             properties: {
               collection: {
                 type: 'string',
-                description: 'Collection name'
+                description: 'Collection name',
               },
               filters: {
                 type: 'array',
@@ -137,28 +142,29 @@ class FirebaseMcpServer {
                   properties: {
                     field: {
                       type: 'string',
-                      description: 'Field name to filter'
+                      description: 'Field name to filter',
                     },
                     operator: {
                       type: 'string',
-                      description: 'Comparison operator (==, >, <, >=, <=, array-contains, in, array-contains-any)'
+                      description:
+                        'Comparison operator (==, >, <, >=, <=, array-contains, in, array-contains-any)',
                     },
                     value: {
                       type: 'string',
-                      description: 'Value to compare against (use ISO format for dates)'
-                    }
+                      description: 'Value to compare against (use ISO format for dates)',
+                    },
                   },
-                  required: ['field', 'operator', 'value']
-                }
+                  required: ['field', 'operator', 'value'],
+                },
               },
               limit: {
                 type: 'number',
                 description: 'Number of documents to return',
-                default: 20
+                default: 20,
               },
               pageToken: {
                 type: 'string',
-                description: 'Token for pagination to get the next page of results'
+                description: 'Token for pagination to get the next page of results',
               },
               orderBy: {
                 type: 'array',
@@ -168,21 +174,21 @@ class FirebaseMcpServer {
                   properties: {
                     field: {
                       type: 'string',
-                      description: 'Field name to order by'
+                      description: 'Field name to order by',
                     },
                     direction: {
                       type: 'string',
                       description: 'Sort direction (asc or desc)',
                       enum: ['asc', 'desc'],
-                      default: 'asc'
-                    }
+                      default: 'asc',
+                    },
                   },
-                  required: ['field']
-                }
-              }
+                  required: ['field'],
+                },
+              },
             },
-            required: ['collection']
-          }
+            required: ['collection'],
+          },
         },
         {
           name: 'firestore_get_document',
@@ -192,15 +198,15 @@ class FirebaseMcpServer {
             properties: {
               collection: {
                 type: 'string',
-                description: 'Collection name'
+                description: 'Collection name',
               },
               id: {
                 type: 'string',
-                description: 'Document ID'
-              }
+                description: 'Document ID',
+              },
             },
-            required: ['collection', 'id']
-          }
+            required: ['collection', 'id'],
+          },
         },
         {
           name: 'firestore_update_document',
@@ -210,19 +216,19 @@ class FirebaseMcpServer {
             properties: {
               collection: {
                 type: 'string',
-                description: 'Collection name'
+                description: 'Collection name',
               },
               id: {
                 type: 'string',
-                description: 'Document ID'
+                description: 'Document ID',
               },
               data: {
                 type: 'object',
-                description: 'Updated document data'
-              }
+                description: 'Updated document data',
+              },
             },
-            required: ['collection', 'id', 'data']
-          }
+            required: ['collection', 'id', 'data'],
+          },
         },
         {
           name: 'firestore_delete_document',
@@ -232,15 +238,15 @@ class FirebaseMcpServer {
             properties: {
               collection: {
                 type: 'string',
-                description: 'Collection name'
+                description: 'Collection name',
               },
               id: {
                 type: 'string',
-                description: 'Document ID'
-              }
+                description: 'Document ID',
+              },
             },
-            required: ['collection', 'id']
-          }
+            required: ['collection', 'id'],
+          },
         },
         {
           name: 'auth_get_user',
@@ -250,11 +256,11 @@ class FirebaseMcpServer {
             properties: {
               identifier: {
                 type: 'string',
-                description: 'User ID or email address'
-              }
+                description: 'User ID or email address',
+              },
             },
-            required: ['identifier']
-          }
+            required: ['identifier'],
+          },
         },
         {
           name: 'storage_list_files',
@@ -264,11 +270,12 @@ class FirebaseMcpServer {
             properties: {
               directoryPath: {
                 type: 'string',
-                description: 'The optional path to list files from. If not provided, the root is used.'
-              }
+                description:
+                  'The optional path to list files from. If not provided, the root is used.',
+              },
             },
-            required: []
-          }
+            required: [],
+          },
         },
         {
           name: 'storage_get_file_info',
@@ -278,11 +285,11 @@ class FirebaseMcpServer {
             properties: {
               filePath: {
                 type: 'string',
-                description: 'The path of the file to get information for'
-              }
+                description: 'The path of the file to get information for',
+              },
             },
-            required: ['filePath']
-          }
+            required: ['filePath'],
+          },
         },
         {
           name: 'firestore_list_collections',
@@ -290,18 +297,20 @@ class FirebaseMcpServer {
           inputSchema: {
             type: 'object',
             properties: {},
-            required: []
-          }
+            required: [],
+          },
         },
         {
           name: 'firestore_query_collection_group',
-          description: 'Query documents across all subcollections with the same name (collection group query)',
+          description:
+            'Query documents across all subcollections with the same name (collection group query)',
           inputSchema: {
             type: 'object',
             properties: {
               collectionId: {
                 type: 'string',
-                description: 'The collection ID to query across all documents (without parent path)'
+                description:
+                  'The collection ID to query across all documents (without parent path)',
               },
               filters: {
                 type: 'array',
@@ -309,21 +318,22 @@ class FirebaseMcpServer {
                 items: {
                   type: 'object',
                   properties: {
-                    field: { 
+                    field: {
                       type: 'string',
-                      description: 'Field name to filter' 
+                      description: 'Field name to filter',
                     },
-                    operator: { 
-                      type: 'string', 
-                      description: 'Comparison operator (==, !=, <, <=, >, >=, array-contains, array-contains-any, in, not-in)' 
-                    },
-                    value: { 
+                    operator: {
                       type: 'string',
-                      description: 'Value to compare against' 
-                    }
+                      description:
+                        'Comparison operator (==, !=, <, <=, >, >=, array-contains, array-contains-any, in, not-in)',
+                    },
+                    value: {
+                      type: 'string',
+                      description: 'Value to compare against',
+                    },
                   },
-                  required: ['field', 'operator', 'value']
-                }
+                  required: ['field', 'operator', 'value'],
+                },
               },
               orderBy: {
                 type: 'array',
@@ -331,48 +341,50 @@ class FirebaseMcpServer {
                 items: {
                   type: 'object',
                   properties: {
-                    field: { 
+                    field: {
                       type: 'string',
-                      description: 'Field name to order by' 
+                      description: 'Field name to order by',
                     },
-                    direction: { 
-                      type: 'string', 
+                    direction: {
+                      type: 'string',
                       enum: ['asc', 'desc'],
                       default: 'asc',
-                      description: 'Sort direction (asc or desc)'
-                    }
+                      description: 'Sort direction (asc or desc)',
+                    },
                   },
-                  required: ['field']
-                }
+                  required: ['field'],
+                },
               },
               limit: {
                 type: 'number',
-                description: 'Maximum number of documents to return (default: 20, max: 100)'
+                description: 'Maximum number of documents to return (default: 20, max: 100)',
               },
               pageToken: {
                 type: 'string',
-                description: 'Token for pagination (document path to start after)'
-              }
+                description: 'Token for pagination (document path to start after)',
+              },
             },
-            required: ['collectionId']
-          }
-        }
-      ]
+            required: ['collectionId'],
+          },
+        },
+      ],
     }));
 
     // Handle tool execution
-    this.server.setRequestHandler(CallToolRequestSchema, async (request) => {
+    this.server.setRequestHandler(CallToolRequestSchema, async request => {
       const { name, arguments: args = {} } = request.params;
 
       try {
         if (!app) {
           return {
-            content: [{
-              type: 'text',
-              text: JSON.stringify({
-                error: 'Firebase initialization failed'
-              })
-            }]
+            content: [
+              {
+                type: 'text',
+                text: JSON.stringify({
+                  error: 'Firebase initialization failed',
+                }),
+              },
+            ],
           };
         }
 
@@ -381,30 +393,34 @@ class FirebaseMcpServer {
             const collection = args.collection as string;
             const data = args.data as Record<string, any>;
             const docRef = await admin.firestore().collection(collection).add(data);
-            
+
             return {
-              content: [{
-                type: 'text',
-                text: JSON.stringify({
-                  id: docRef.id,
-                  path: docRef.path
-                })
-              }]
+              content: [
+                {
+                  type: 'text',
+                  text: JSON.stringify({
+                    id: docRef.id,
+                    path: docRef.path,
+                  }),
+                },
+              ],
             };
           }
 
           case 'firestore_list_documents': {
             const collection = args.collection as string;
             const limit = Math.min(Math.max(1, (args.limit as number) || 20), 100); // Default 20, max 100
-            
+
             let query: admin.firestore.Query = admin.firestore().collection(collection);
 
             // Apply filters if provided
-            const filters = args.filters as Array<{
-              field: string;
-              operator: admin.firestore.WhereFilterOp;
-              value: any;
-            }> | undefined;
+            const filters = args.filters as
+              | Array<{
+                  field: string;
+                  operator: admin.firestore.WhereFilterOp;
+                  value: any;
+                }>
+              | undefined;
 
             if (filters && filters.length > 0) {
               filters.forEach(filter => {
@@ -413,10 +429,12 @@ class FirebaseMcpServer {
             }
 
             // Apply ordering if provided
-            const orderBy = args.orderBy as Array<{
-              field: string;
-              direction?: 'asc' | 'desc';
-            }> | undefined;
+            const orderBy = args.orderBy as
+              | Array<{
+                  field: string;
+                  direction?: 'asc' | 'desc';
+                }>
+              | undefined;
 
             if (orderBy && orderBy.length > 0) {
               orderBy.forEach(order => {
@@ -432,104 +450,126 @@ class FirebaseMcpServer {
                 query = query.startAfter(lastDoc);
               }
             }
-            
+
             // Apply limit
             query = query.limit(limit);
-            
+
             const snapshot = await query.get();
             const documents = snapshot.docs.map(doc => {
               const rawData = doc.data();
               // Sanitize data to ensure it's JSON-serializable
-              const data = Object.entries(rawData).reduce((acc, [key, value]) => {
-                // Handle basic types directly
-                if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean' || value === null) {
-                  acc[key] = value;
-                }
-                // Convert Date objects to ISO strings
-                else if (value instanceof Date) {
-                  acc[key] = value.toISOString();
-                }
-                // Convert arrays to strings
-                else if (Array.isArray(value)) {
-                  acc[key] = `[${value.join(', ')}]`;
-                }
-                // Convert other objects to string representation
-                else if (typeof value === 'object') {
-                  acc[key] = '[Object]';
-                }
-                // Convert other types to strings
-                else {
-                  acc[key] = String(value);
-                }
-                return acc;
-              }, {} as Record<string, any>);
+              const data = Object.entries(rawData).reduce(
+                (acc, [key, value]) => {
+                  // Handle basic types directly
+                  if (
+                    typeof value === 'string' ||
+                    typeof value === 'number' ||
+                    typeof value === 'boolean' ||
+                    value === null
+                  ) {
+                    acc[key] = value;
+                  }
+                  // Convert Date objects to ISO strings
+                  else if (value instanceof Date) {
+                    acc[key] = value.toISOString();
+                  }
+                  // Convert arrays to strings
+                  else if (Array.isArray(value)) {
+                    acc[key] = `[${value.join(', ')}]`;
+                  }
+                  // Convert other objects to string representation
+                  else if (typeof value === 'object') {
+                    acc[key] = '[Object]';
+                  }
+                  // Convert other types to strings
+                  else {
+                    acc[key] = String(value);
+                  }
+                  return acc;
+                },
+                {} as Record<string, any>
+              );
 
               return {
                 id: doc.id,
                 path: doc.ref.path,
-                data
+                data,
               };
             });
 
             // Get the last document for pagination
             const lastVisible = snapshot.docs[snapshot.docs.length - 1];
             const nextPageToken = lastVisible ? lastVisible.ref.path : null;
-            
+
             return {
-              content: [{
-                type: 'text',
-                text: JSON.stringify({
-                  documents,
-                  nextPageToken
-                })
-              }]
+              content: [
+                {
+                  type: 'text',
+                  text: JSON.stringify({
+                    documents,
+                    nextPageToken,
+                  }),
+                },
+              ],
             };
           }
 
           case 'firestore_get_document': {
             const collection = args.collection as string;
             const id = args.id as string;
-            
+
             const docRef = admin.firestore().collection(collection).doc(id);
             const doc = await docRef.get();
-            
+
             if (!doc.exists) {
               return {
-                content: [{
-                  type: 'text',
-                  text: JSON.stringify({
-                    error: 'Document not found'
-                  })
-                }]
+                content: [
+                  {
+                    type: 'text',
+                    text: JSON.stringify({
+                      error: 'Document not found',
+                    }),
+                  },
+                ],
               };
             }
 
             const rawData = doc.data();
             // Sanitize data to ensure it's JSON-serializable
-            const data = Object.entries(rawData || {}).reduce((acc, [key, value]) => {
-              if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean' || value === null) {
-                acc[key] = value;
-              } else if (value instanceof Date) {
-                acc[key] = value.toISOString();
-              } else if (Array.isArray(value)) {
-                acc[key] = `[${value.join(', ')}]`;
-              } else if (typeof value === 'object') {
-                acc[key] = '[Object]';
-              } else {
-                acc[key] = String(value);
-              }
-              return acc;
-            }, {} as Record<string, any>);
+            const data = Object.entries(rawData || {}).reduce(
+              (acc, [key, value]) => {
+                if (
+                  typeof value === 'string' ||
+                  typeof value === 'number' ||
+                  typeof value === 'boolean' ||
+                  value === null
+                ) {
+                  acc[key] = value;
+                } else if (value instanceof Date) {
+                  acc[key] = value.toISOString();
+                } else if (Array.isArray(value)) {
+                  acc[key] = `[${value.join(', ')}]`;
+                } else if (typeof value === 'object') {
+                  acc[key] = '[Object]';
+                } else {
+                  acc[key] = String(value);
+                }
+                return acc;
+              },
+              {} as Record<string, any>
+            );
 
             return {
-              content: [{
-                type: 'text',
-                text: JSON.stringify({
-                  id: doc.id,
-                  path: doc.ref.path,
-                  data
-                })
-              }]
+              content: [
+                {
+                  type: 'text',
+                  text: JSON.stringify({
+                    id: doc.id,
+                    path: doc.ref.path,
+                    data,
+                  }),
+                },
+              ],
             };
           }
 
@@ -537,44 +577,48 @@ class FirebaseMcpServer {
             const collection = args.collection as string;
             const id = args.id as string;
             const data = args.data as Record<string, any>;
-            
+
             const docRef = admin.firestore().collection(collection).doc(id);
             await docRef.update(data);
-            
+
             return {
-              content: [{
-                type: 'text',
-                text: JSON.stringify({
-                  id,
-                  path: docRef.path,
-                  updated: true
-                })
-              }]
+              content: [
+                {
+                  type: 'text',
+                  text: JSON.stringify({
+                    id,
+                    path: docRef.path,
+                    updated: true,
+                  }),
+                },
+              ],
             };
           }
 
           case 'firestore_delete_document': {
             const collection = args.collection as string;
             const id = args.id as string;
-            
+
             const docRef = admin.firestore().collection(collection).doc(id);
             await docRef.delete();
-            
+
             return {
-              content: [{
-                type: 'text',
-                text: JSON.stringify({
-                  id,
-                  path: docRef.path,
-                  deleted: true
-                })
-              }]
+              content: [
+                {
+                  type: 'text',
+                  text: JSON.stringify({
+                    id,
+                    path: docRef.path,
+                    deleted: true,
+                  }),
+                },
+              ],
             };
           }
 
           case 'auth_get_user': {
             const identifier = args.identifier as string;
-            
+
             try {
               let user;
               // Try to get user by email first
@@ -597,32 +641,36 @@ class FirebaseMcpServer {
                 disabled: user.disabled,
                 metadata: {
                   creationTime: user.metadata.creationTime,
-                  lastSignInTime: user.metadata.lastSignInTime
-                }
+                  lastSignInTime: user.metadata.lastSignInTime,
+                },
               };
 
               return {
-                content: [{
-                  type: 'text',
-                  text: JSON.stringify({ user: sanitizedUser })
-                }]
+                content: [
+                  {
+                    type: 'text',
+                    text: JSON.stringify({ user: sanitizedUser }),
+                  },
+                ],
               };
             } catch (error) {
               return {
-                content: [{
-                  type: 'text',
-                  text: JSON.stringify({
-                    error: 'User not found',
-                    details: error instanceof Error ? error.message : 'Unknown error'
-                  })
-                }]
+                content: [
+                  {
+                    type: 'text',
+                    text: JSON.stringify({
+                      error: 'User not found',
+                      details: error instanceof Error ? error.message : 'Unknown error',
+                    }),
+                  },
+                ],
               };
             }
           }
 
           case 'storage_list_files': {
             const directoryPath = (args.directoryPath as string) || '';
-            
+
             try {
               logger.debug(`Listing files in directory: ${directoryPath}`);
               const bucket = admin.storage().bucket();
@@ -630,7 +678,7 @@ class FirebaseMcpServer {
 
               const [files] = await bucket.getFiles({
                 prefix: directoryPath,
-                delimiter: '/'
+                delimiter: '/',
               });
 
               logger.debug(`Found ${files.length} files`);
@@ -640,49 +688,59 @@ class FirebaseMcpServer {
                 size: file.metadata.size ? file.metadata.size : '0',
                 contentType: file.metadata.contentType || null,
                 updated: file.metadata.updated || null,
-                md5Hash: file.metadata.md5Hash || null
+                md5Hash: file.metadata.md5Hash || null,
               }));
 
               return {
-                content: [{
-                  type: 'text',
-                  text: JSON.stringify({ files: fileList }, null, 2)
-                }]
+                content: [
+                  {
+                    type: 'text',
+                    text: JSON.stringify({ files: fileList }, null, 2),
+                  },
+                ],
               };
             } catch (error) {
               logger.error('Failed to list files', error);
               return {
-                content: [{
-                  type: 'text',
-                  text: JSON.stringify({
-                    error: 'Failed to list files',
-                    details: error instanceof Error ? error.message : 'Unknown error'
-                  })
-                }]
+                content: [
+                  {
+                    type: 'text',
+                    text: JSON.stringify({
+                      error: 'Failed to list files',
+                      details: error instanceof Error ? error.message : 'Unknown error',
+                    }),
+                  },
+                ],
               };
             }
           }
 
           case 'storage_get_file_info': {
             const filePath = args.filePath as string;
-            
+
             try {
               logger.debug(`Getting info for file: ${filePath}`);
               const bucket = admin.storage().bucket();
               logger.debug(`Got bucket reference: ${bucket.name}`);
-              
+
               const file = bucket.file(filePath);
               const [exists] = await file.exists();
-              
+
               if (!exists) {
                 logger.warn(`File not found: ${filePath}`);
                 return {
-                  content: [{
-                    type: 'text',
-                    text: JSON.stringify({
-                      error: 'File not found'
-                    }, null, 2)
-                  }]
+                  content: [
+                    {
+                      type: 'text',
+                      text: JSON.stringify(
+                        {
+                          error: 'File not found',
+                        },
+                        null,
+                        2
+                      ),
+                    },
+                  ],
                 };
               }
 
@@ -690,7 +748,7 @@ class FirebaseMcpServer {
               const [metadata] = await file.getMetadata();
               const [url] = await file.getSignedUrl({
                 action: 'read',
-                expires: Date.now() + 15 * 60 * 1000 // URL expires in 15 minutes
+                expires: Date.now() + 15 * 60 * 1000, // URL expires in 15 minutes
               });
 
               const fileInfo = {
@@ -700,25 +758,29 @@ class FirebaseMcpServer {
                 contentType: metadata.contentType || null,
                 updated: metadata.updated || null,
                 md5Hash: metadata.md5Hash || null,
-                downloadUrl: url
+                downloadUrl: url,
               };
 
               return {
-                content: [{
-                  type: 'text',
-                  text: JSON.stringify(fileInfo, null, 2)
-                }]
+                content: [
+                  {
+                    type: 'text',
+                    text: JSON.stringify(fileInfo, null, 2),
+                  },
+                ],
               };
             } catch (error) {
               logger.error('Failed to get file info', error);
               return {
-                content: [{
-                  type: 'text',
-                  text: JSON.stringify({
-                    error: 'Failed to get file info',
-                    details: error instanceof Error ? error.message : 'Unknown error'
-                  })
-                }]
+                content: [
+                  {
+                    type: 'text',
+                    text: JSON.stringify({
+                      error: 'Failed to get file info',
+                      details: error instanceof Error ? error.message : 'Unknown error',
+                    }),
+                  },
+                ],
               };
             }
           }
@@ -727,30 +789,34 @@ class FirebaseMcpServer {
             const collections = await admin.firestore().listCollections();
             const collectionList = collections.map(collection => ({
               id: collection.id,
-              path: collection.path
+              path: collection.path,
             }));
-            
+
             return {
-              content: [{
-                type: 'text',
-                text: JSON.stringify({ collections: collectionList })
-              }]
+              content: [
+                {
+                  type: 'text',
+                  text: JSON.stringify({ collections: collectionList }),
+                },
+              ],
             };
 
           case 'firestore_query_collection_group': {
             const collectionId = args.collectionId as string;
             const limit = Math.min(Math.max(1, (args.limit as number) || 20), 100); // Default 20, max 100
-            
+
             try {
               // Use the collectionGroup API directly here instead of importing
               let query: any = admin.firestore().collectionGroup(collectionId);
 
               // Apply filters if provided
-              const filters = args.filters as Array<{
-                field: string;
-                operator: admin.firestore.WhereFilterOp;
-                value: any;
-              }> | undefined;
+              const filters = args.filters as
+                | Array<{
+                    field: string;
+                    operator: admin.firestore.WhereFilterOp;
+                    value: any;
+                  }>
+                | undefined;
 
               if (filters && filters.length > 0) {
                 filters.forEach(filter => {
@@ -759,10 +825,12 @@ class FirebaseMcpServer {
               }
 
               // Apply ordering if provided
-              const orderBy = args.orderBy as Array<{
-                field: string;
-                direction?: 'asc' | 'desc';
-              }> | undefined;
+              const orderBy = args.orderBy as
+                | Array<{
+                    field: string;
+                    direction?: 'asc' | 'desc';
+                  }>
+                | undefined;
 
               if (orderBy && orderBy.length > 0) {
                 orderBy.forEach(order => {
@@ -778,86 +846,108 @@ class FirebaseMcpServer {
                   query = query.startAfter(lastDoc);
                 }
               }
-              
+
               // Apply limit
               query = query.limit(limit);
-              
-              const snapshot = await query.get();
-              
-              const documents = snapshot.docs.map((doc: FirebaseFirestore.QueryDocumentSnapshot) => {
-                const rawData = doc.data();
-                // Sanitize data to ensure it's JSON-serializable
-                const data = Object.entries(rawData).reduce((acc, [key, value]) => {
-                  // Handle basic types directly
-                  if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean' || value === null) {
-                    acc[key] = value;
-                  }
-                  // Convert Date objects to ISO strings
-                  else if (value instanceof Date) {
-                    acc[key] = value.toISOString();
-                  }
-                  // Convert arrays to strings
-                  else if (Array.isArray(value)) {
-                    acc[key] = `[${value.join(', ')}]`;
-                  }
-                  // Convert other objects to string representation
-                  else if (typeof value === 'object') {
-                    acc[key] = '[Object]';
-                  }
-                  // Convert other types to strings
-                  else {
-                    acc[key] = String(value);
-                  }
-                  return acc;
-                }, {} as Record<string, any>);
 
-                return {
-                  id: doc.id,
-                  path: doc.ref.path,
-                  data
-                };
-              });
+              const snapshot = await query.get();
+
+              const documents = snapshot.docs.map(
+                (doc: FirebaseFirestore.QueryDocumentSnapshot) => {
+                  const rawData = doc.data();
+                  // Sanitize data to ensure it's JSON-serializable
+                  const data = Object.entries(rawData).reduce(
+                    (acc, [key, value]) => {
+                      // Handle basic types directly
+                      if (
+                        typeof value === 'string' ||
+                        typeof value === 'number' ||
+                        typeof value === 'boolean' ||
+                        value === null
+                      ) {
+                        acc[key] = value;
+                      }
+                      // Convert Date objects to ISO strings
+                      else if (value instanceof Date) {
+                        acc[key] = value.toISOString();
+                      }
+                      // Convert arrays to strings
+                      else if (Array.isArray(value)) {
+                        acc[key] = `[${value.join(', ')}]`;
+                      }
+                      // Convert other objects to string representation
+                      else if (typeof value === 'object') {
+                        acc[key] = '[Object]';
+                      }
+                      // Convert other types to strings
+                      else {
+                        acc[key] = String(value);
+                      }
+                      return acc;
+                    },
+                    {} as Record<string, any>
+                  );
+
+                  return {
+                    id: doc.id,
+                    path: doc.ref.path,
+                    data,
+                  };
+                }
+              );
 
               // Get the last document for pagination
               const lastVisible = snapshot.docs[snapshot.docs.length - 1];
               const nextPageToken = lastVisible ? lastVisible.ref.path : null;
-              
+
               return {
-                content: [{
-                  type: 'text',
-                  text: JSON.stringify({
-                    documents,
-                    nextPageToken
-                  })
-                }]
+                content: [
+                  {
+                    type: 'text',
+                    text: JSON.stringify({
+                      documents,
+                      nextPageToken,
+                    }),
+                  },
+                ],
               };
             } catch (error) {
               logger.error('Error in collection group query:', error);
-              
+
               // Special handling for Firebase index errors
               const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-              if (errorMessage.includes('FAILED_PRECONDITION') && errorMessage.includes('requires an index')) {
-                const indexUrl = errorMessage.match(/https:\/\/console\.firebase\.google\.com[^\s]*/)?.[0];
+              if (
+                errorMessage.includes('FAILED_PRECONDITION') &&
+                errorMessage.includes('requires an index')
+              ) {
+                const indexUrl = errorMessage.match(
+                  /https:\/\/console\.firebase\.google\.com[^\s]*/
+                )?.[0];
                 return {
-                  content: [{
-                    type: 'text',
-                    text: JSON.stringify({
-                      error: 'This query requires a composite index.',
-                      details: 'When ordering by multiple fields or combining filters with ordering, you need to create a composite index.',
-                      indexUrl: indexUrl || null,
-                      message: errorMessage
-                    })
-                  }]
+                  content: [
+                    {
+                      type: 'text',
+                      text: JSON.stringify({
+                        error: 'This query requires a composite index.',
+                        details:
+                          'When ordering by multiple fields or combining filters with ordering, you need to create a composite index.',
+                        indexUrl: indexUrl || null,
+                        message: errorMessage,
+                      }),
+                    },
+                  ],
                 };
               }
-              
+
               return {
-                content: [{
-                  type: 'text',
-                  text: JSON.stringify({
-                    error: errorMessage
-                  })
-                }]
+                content: [
+                  {
+                    type: 'text',
+                    text: JSON.stringify({
+                      error: errorMessage,
+                    }),
+                  },
+                ],
               };
             }
           }
@@ -867,29 +957,39 @@ class FirebaseMcpServer {
         }
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-        
+
         // Check if it's an index error and extract the index creation URL
-        if (errorMessage.includes('FAILED_PRECONDITION') && errorMessage.includes('requires an index')) {
-          const indexUrl = errorMessage.match(/https:\/\/console\.firebase\.google\.com[^\s]*/)?.[0];
+        if (
+          errorMessage.includes('FAILED_PRECONDITION') &&
+          errorMessage.includes('requires an index')
+        ) {
+          const indexUrl = errorMessage.match(
+            /https:\/\/console\.firebase\.google\.com[^\s]*/
+          )?.[0];
           return {
-            content: [{
-              type: 'text',
-              text: JSON.stringify({
-                error: 'This query requires a composite index.',
-                details: 'When ordering by multiple fields or combining filters with ordering, you need to create a composite index.',
-                indexUrl: indexUrl || null
-              })
-            }]
+            content: [
+              {
+                type: 'text',
+                text: JSON.stringify({
+                  error: 'This query requires a composite index.',
+                  details:
+                    'When ordering by multiple fields or combining filters with ordering, you need to create a composite index.',
+                  indexUrl: indexUrl || null,
+                }),
+              },
+            ],
           };
         }
 
         return {
-          content: [{
-            type: 'text',
-            text: JSON.stringify({
-              error: errorMessage
-            })
-          }]
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify({
+                error: errorMessage,
+              }),
+            },
+          ],
         };
       }
     });
