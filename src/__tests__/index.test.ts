@@ -19,6 +19,7 @@ const createServerMock = () => ({
 type ServerMock = ReturnType<typeof createServerMock>;
 
 // Mock Firestore document reference
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const createDocRefMock = (collection: string, id: string, data?: any) => ({
   id,
   path: `${collection}/${id}`,
@@ -60,13 +61,12 @@ const createCollectionMock = (collectionName: string) => {
 };
 
 type FirestoreMock = {
-  collection: ReturnType<
-    typeof vi.fn<[collection: string], ReturnType<typeof createCollectionMock>>
-  >;
+  collection: ReturnType<typeof vi.fn>;
   listCollections?: ReturnType<typeof vi.fn>;
 };
 
 // Declare mock variables
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 let serverConstructor: any;
 let serverMock: ServerMock;
 let loggerMock: {
@@ -76,7 +76,7 @@ let loggerMock: {
 };
 let processExitMock: ReturnType<typeof vi.fn>;
 let adminMock: {
-  app: ReturnType<typeof vi.fn<[], App>>;
+  app: ReturnType<typeof vi.fn>;
   credential: { cert: ReturnType<typeof vi.fn> };
   initializeApp: ReturnType<typeof vi.fn>;
   firestore: () => FirestoreMock;
@@ -108,13 +108,15 @@ describe('Firebase MCP Server', () => {
 
     // Mock process.exit
     processExitMock = vi.fn();
-    const originalExit = process.exit;
+    // Save original exit for cleanup if needed
+    // const originalExit = process.exit;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     process.exit = processExitMock as any;
 
     // Create admin mock with Firestore
     const collectionMock = createCollectionMock('test');
     adminMock = {
-      app: vi.fn<[], App>(() => ({ name: '[DEFAULT]' }) as App),
+      app: vi.fn(() => ({ name: '[DEFAULT]' }) as App),
       credential: {
         cert: vi.fn(),
       },
@@ -209,9 +211,11 @@ describe('Firebase MCP Server', () => {
       );
 
       // Get the ListTools handler and test it
-      const listToolsHandler = serverMock.setRequestHandler.mock.calls.find(
+      const listToolsCall = serverMock.setRequestHandler.mock.calls.find(
         call => call[0] === ListToolsRequestSchema
-      )[1];
+      );
+      expect(listToolsCall).toBeDefined();
+      const listToolsHandler = listToolsCall![1];
 
       const result = await listToolsHandler();
       expect(result.tools).toEqual(
@@ -245,9 +249,11 @@ describe('Firebase MCP Server', () => {
       );
 
       // Get the CallTool handler and test it
-      const callToolHandler = serverMock.setRequestHandler.mock.calls.find(
+      const callToolCall = serverMock.setRequestHandler.mock.calls.find(
         call => call[0] === CallToolRequestSchema
-      )[1];
+      );
+      expect(callToolCall).toBeDefined();
+      const callToolHandler = callToolCall![1];
 
       // Test calling a tool with proper params format
       await expect(
@@ -288,13 +294,16 @@ describe('Firebase MCP Server', () => {
   });
 
   describe('Tool Execution', () => {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-function-type
     let callToolHandler: Function;
 
     beforeEach(async () => {
       await import('../index');
-      callToolHandler = serverMock.setRequestHandler.mock.calls.find(
+      const callToolCall = serverMock.setRequestHandler.mock.calls.find(
         call => call[0] === CallToolRequestSchema
-      )[1];
+      );
+      expect(callToolCall).toBeDefined();
+      callToolHandler = callToolCall![1];
     });
 
     it('should handle uninitialized Firebase', async () => {
@@ -317,9 +326,11 @@ describe('Firebase MCP Server', () => {
       await import('../index');
 
       // Get the new handler after re-importing
-      callToolHandler = serverMock.setRequestHandler.mock.calls.find(
+      const callToolCall = serverMock.setRequestHandler.mock.calls.find(
         call => call[0] === CallToolRequestSchema
-      )[1];
+      );
+      expect(callToolCall).toBeDefined();
+      callToolHandler = callToolCall![1];
 
       const result = await callToolHandler({
         params: {

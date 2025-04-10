@@ -8,7 +8,7 @@ import {
   queryCollectionGroup,
 } from '../firestoreClient';
 import { admin } from '../firebaseConfig';
-import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, beforeEach, vi } from 'vitest';
 
 // Test imports for mocking
 import * as firebaseConfig from '../firebaseConfig';
@@ -44,7 +44,7 @@ async function deleteTestDocument() {
   try {
     await admin.firestore().collection(testCollection).doc(testDocId).delete();
     console.log('[TEST DEBUG]', 'Test document deleted:', testDocId);
-  } catch (error) {
+  } catch (_error) {
     // Ignore errors if document doesn't exist
   }
 }
@@ -512,7 +512,7 @@ describe('Firestore Client', () => {
     // Test pagination with pageToken
     it('should handle pagination with pageToken', async () => {
       // Create multiple documents to ensure pagination
-      const docIds = [];
+      const docIds: string[] = [];
       const batchSize = 5;
 
       try {
@@ -901,7 +901,7 @@ describe('Firestore Client', () => {
               } else if (responseData.documents) {
                 expect(Array.isArray(responseData.documents)).toBe(true);
               }
-            } catch (e) {
+            } catch (_e) {
               // If parsing fails, just verify we have content
               expect(typeof result.content[0].text).toBe('string');
             }

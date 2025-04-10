@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import type * as adminTypes from 'firebase-admin';
+// import type * as adminTypes from 'firebase-admin';
 
 // Mock fs module
 vi.mock('fs', () => {

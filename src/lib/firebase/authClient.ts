@@ -46,7 +46,7 @@ export async function getUserByIdOrEmail(identifier: string): Promise<AuthRespon
     return {
       content: [{ type: 'json', text: JSON.stringify(user) }],
     };
-  } catch (error) {
+  } catch (_error) {
     return {
       content: [{ type: 'error', text: `User not found: ${identifier}` }],
       isError: true,

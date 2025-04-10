@@ -8,10 +8,8 @@
  * @module firebase-mcp/firestore
  */
 
-import { Query, Timestamp } from 'firebase-admin/firestore';
-import { db, getProjectId } from './firebaseConfig';
-import fs from 'fs';
-import path from 'path';
+import { Timestamp } from 'firebase-admin/firestore';
+import { getProjectId } from './firebaseConfig';
 import * as admin from 'firebase-admin';
 
 interface FirestoreResponse {
@@ -24,8 +22,8 @@ interface FirestoreResponse {
  * Results are paginated and include links to the Firebase console.
  *
  * @param {string} [documentPath] - Optional path to a document to list subcollections
- * @param {number} [limit=20] - Maximum number of collections to return
- * @param {string} [pageToken] - Token for pagination (collection ID to start after)
+ * @param {number} [_limit=20] - Maximum number of collections to return (currently unused)
+ * @param {string} [_pageToken] - Token for pagination (collection ID to start after) (currently unused)
  * @returns {Promise<Object>} MCP-formatted response with collection data
  * @throws {Error} If Firebase is not initialized or if there's a Firestore error
  *
@@ -39,8 +37,8 @@ interface FirestoreResponse {
  */
 export async function list_collections(
   documentPath?: string,
-  limit: number = 20,
-  pageToken?: string
+  _limit: number = 20,
+  _pageToken?: string
 ): Promise<FirestoreResponse> {
   try {
     const collections = documentPath
@@ -88,10 +86,11 @@ export async function list_collections(
  * Converts Firestore Timestamp objects to ISO string format for JSON serialization.
  * This is a helper function used internally by other functions.
  *
- * @param {any} data - The data object containing potential Timestamp fields
- * @returns {any} The same data object with Timestamps converted to ISO strings
+ * @param data - The data object containing potential Timestamp fields
+ * @returns The same data object with Timestamps converted to ISO strings
  * @private
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function convertTimestampsToISO(data: any) {
   for (const key in data) {
     if (data[key] instanceof Timestamp) {

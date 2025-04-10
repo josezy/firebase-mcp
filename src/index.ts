@@ -36,11 +36,13 @@ function initializeFirebase() {
         logger.debug('Using existing Firebase app');
         return existingApp;
       }
-    } catch (error) {
+    } catch (_error) {
       // No existing app, continue with initialization
       logger.debug('No existing Firebase app, initializing new one');
     }
 
+    // Using require for dynamic import based on environment variable
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const serviceAccount = require(serviceAccountPath);
     const storageBucket = process.env.FIREBASE_STORAGE_BUCKET;
     logger.debug(`Initializing Firebase with storage bucket: ${storageBucket}`);
@@ -58,6 +60,8 @@ function initializeFirebase() {
 // Initialize Firebase
 const app = initializeFirebase();
 
+// Response interface used throughout the codebase
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 interface McpResponse {
   content: Array<{ type: string; text: string }>;
   isError?: boolean;

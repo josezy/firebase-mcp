@@ -43,7 +43,7 @@ function initializeFirebase(): admin.app.App | null {
       if (existingApp) {
         return existingApp;
       }
-    } catch (error) {
+    } catch (_error) {
       // No existing app, continue with initialization
     }
 
@@ -74,10 +74,10 @@ function initializeFirebase(): admin.app.App | null {
         credential: admin.credential.cert(serviceAccount as admin.ServiceAccount),
         storageBucket: storageBucket,
       });
-    } catch (error) {
+    } catch (_error) {
       return null;
     }
-  } catch (error) {
+  } catch (_error) {
     return null;
   }
 }
@@ -108,7 +108,7 @@ function getProjectId(serviceAccountPath: string): string | null {
     // Read and parse the service account file
     const serviceAccount = JSON.parse(fs.readFileSync(serviceAccountPath, 'utf8'));
     return serviceAccount.project_id || null;
-  } catch (error) {
+  } catch (_error) {
     return null;
   }
 }

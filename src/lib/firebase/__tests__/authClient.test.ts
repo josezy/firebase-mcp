@@ -24,7 +24,7 @@ async function ensureTestUser() {
       testId = user.uid;
       logger.debug('Test user already exists:', testEmail);
       return;
-    } catch (error) {
+    } catch (_error) {
       // User doesn't exist, create it
       const user = await admin.auth().createUser({
         email: testEmail,
@@ -45,7 +45,7 @@ async function deleteTestUser() {
       await admin.auth().deleteUser(testId);
       logger.debug('Test user deleted:', testEmail);
     }
-  } catch (error) {
+  } catch (_error) {
     // Ignore errors if user doesn't exist
   }
 }

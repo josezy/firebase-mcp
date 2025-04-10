@@ -95,7 +95,7 @@ export async function getBucket() {
     const possibleBucketNames = [`${projectId}.firebasestorage.app`, `${projectId}.appspot.com`];
 
     return admin.storage().bucket(possibleBucketNames[0]);
-  } catch (error) {
+  } catch (_error) {
     return null;
   }
 }

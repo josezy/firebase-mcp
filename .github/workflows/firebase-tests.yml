@@ -5,9 +5,9 @@ name: Firebase Tests CI
 
 on:
   push:
-    branches: [ "**" ]  # Trigger on all branches
+    branches: [ "main" ]  
   pull_request:
-    branches: [ "**" ]  # Trigger on all PRs
+    branches: [ "main" ]  
 
 jobs:
   test:
@@ -25,10 +25,16 @@ jobs:
         node-version: ${{ matrix.node-version }}
         cache: 'npm'
     - run: npm ci
-    
-    - name: Install Firebase CLI
-      run: npm install -g firebase-tools
-    
+
+    - name: Check code formatting
+      run: npm run format:check
+
+    - name: Run ESLint
+      run: npm run lint
+
+    - name: Install Firebase CLI and tools
+      run: npm install -g firebase-tools json
+
     - name: Create Firebase project config for emulators
       run: |
         # Create a basic firebase.json if one doesn't exist
@@ -61,7 +67,7 @@ jobs:
           }' > firebase.json
           echo "Created firebase.json for emulators"
         fi
-        
+
         # Create basic firestore rules
         echo 'rules_version = "2";
         service cloud.firestore {
@@ -72,7 +78,7 @@ jobs:
           }
         }' > firestore.rules
         echo "Created firestore.rules"
-        
+
         # Create basic storage rules
         echo 'rules_version = "2";
         service firebase.storage {
@@ -83,7 +89,7 @@ jobs:
           }
         }' > storage.rules
         echo "Created storage.rules"
-        
+
         # Create .firebaserc with project ID
         echo '{
           "projects": {
@@ -91,7 +97,7 @@ jobs:
           }
         }' > .firebaserc
         echo "Created .firebaserc with default project"
-    
+
     - name: Create test service account key
       run: |
         echo '{
@@ -106,7 +112,7 @@ jobs:
           "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
           "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/firebase-adminsdk%40demo-project.iam.gserviceaccount.com"
         }' > firebaseServiceKey.json
-    
+
     - name: Cache Firebase Emulators
       uses: actions/cache@v3
       with:
@@ -114,7 +120,7 @@ jobs:
         key: ${{ runner.os }}-firebase-emulators-${{ hashFiles('firebase.json') }}
         restore-keys: |
           ${{ runner.os }}-firebase-emulators-
-    
+
     - name: Modify vitest setup to use IPv4 addresses
       run: |
         # Update vitest.setup.ts to use 127.0.0.1 instead of localhost
@@ -122,24 +128,24 @@ jobs:
           sed -i 's/process.env.FIRESTORE_EMULATOR_HOST = .*/process.env.FIRESTORE_EMULATOR_HOST = "127.0.0.1:8080";/g' vitest.setup.ts
           sed -i 's/process.env.FIREBASE_AUTH_EMULATOR_HOST = .*/process.env.FIREBASE_AUTH_EMULATOR_HOST = "127.0.0.1:9099";/g' vitest.setup.ts
           sed -i 's/process.env.FIREBASE_STORAGE_EMULATOR_HOST = .*/process.env.FIREBASE_STORAGE_EMULATOR_HOST = "127.0.0.1:9199";/g' vitest.setup.ts
-          
+
           # Print the modified file for debugging
           echo "Modified vitest.setup.ts:"
           cat vitest.setup.ts | grep -A 3 "Firebase initialized for testing"
         else
           echo "vitest.setup.ts file not found"
         fi
-    
+
     - name: Start Firebase Emulators and Run Tests
       run: |
         # Start the emulators in the background
         firebase emulators:start --project demo-project > emulator.log 2>&1 &
         EMULATOR_PID=$!
-        
+
         # Give emulators time to start up
         echo "Waiting for emulators to start..."
         sleep 20
-        
+
         # Check if emulators are running by checking ports
         echo "Checking if Auth emulator is running on port 9099..."
         if nc -z 127.0.0.1 9099; then
@@ -149,7 +155,7 @@ jobs:
           cat emulator.log
           exit 1
         fi
-        
+
         echo "Checking if Firestore emulator is running on port 8080..."
         if nc -z 127.0.0.1 8080; then
           echo "Firestore emulator is running"
@@ -158,7 +164,7 @@ jobs:
           cat emulator.log
           exit 1
         fi
-        
+
         echo "Checking if Storage emulator is running on port 9199..."
         if nc -z 127.0.0.1 9199; then
           echo "Storage emulator is running"
@@ -167,13 +173,13 @@ jobs:
           cat emulator.log
           exit 1
         fi
-        
+
         # Create test user directly in the Auth emulator
         echo "Creating test user directly in Auth emulator..."
         curl -X POST "http://127.0.0.1:9099/identitytoolkit.googleapis.com/v1/projects/demo-project/accounts" \
           -H "Content-Type: application/json" \
           --data-binary '{"localId":"testid","email":"test@example.com","password":"password123","emailVerified":true}'
-        
+
         # Set environment variables for tests
         export USE_FIREBASE_EMULATOR=true
         export SERVICE_ACCOUNT_KEY_PATH="./firebaseServiceKey.json"
@@ -181,19 +187,26 @@ jobs:
         export FIREBASE_AUTH_EMULATOR_HOST="127.0.0.1:9099"
         export FIREBASE_STORAGE_EMULATOR_HOST="127.0.0.1:9199"
         export FIREBASE_STORAGE_BUCKET="demo-project.appspot.com"
-        
-        # Run build
-        npm run build --if-present
-        
-        # Run all tests with Vitest using emulator mode explicitly
-        npm run test:emulator
-        
+
+        # Create a custom preflight script for emulator tests
+        echo '{
+          "scripts": {
+            "preflight:emulator": "npm run format:check && npm run lint && npm run test:emulator && npm run build"
+          }
+        }' > preflight-temp.json
+
+        # Merge the temporary script into package.json
+        npx json -f package.json -I -e "this.scripts['preflight:emulator']=require('./preflight-temp.json').scripts['preflight:emulator']"
+
+        # Run the preflight script with emulator tests
+        npm run preflight:emulator
+
         # Store the test result
         TEST_RESULT=$?
-        
+
         # Kill the emulator process
         kill $EMULATOR_PID
-        
+
         # Return the test result
         exit $TEST_RESULT
 
@@ -202,44 +215,45 @@ jobs:
     needs: test
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
-    
+
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
-      
-    - name: Use Node.js ${{ matrix.node-version }}
+
+    - name: Use Node.js
       uses: actions/setup-node@v4
       with:
         node-version: 20.x
         registry-url: 'https://registry.npmjs.org'
-        
+
     - name: Install dependencies
       run: |
         rm -rf node_modules
         rm -f package-lock.json
         npm install
-      
-    - name: Build package
-      run: npm run build
-      
+
+    - name: Run preflight checks
+      run: npm run preflight
+      # This runs formatting, linting, tests, and build in sequence
+
     - name: Set executable permissions
       run: chmod +x dist/*.js
-      
+
     - name: Check version and determine if publish is needed
       id: check_version
       run: |
         # Get current version from package.json
         CURRENT_VERSION=$(node -p "require('./package.json').version")
         echo "Current version in package.json: $CURRENT_VERSION"
-        
+
         # Get latest version from npm (if it exists)
         if LATEST_VERSION=$(npm view @gannonh/firebase-mcp version 2>/dev/null); then
           echo "Latest published version: $LATEST_VERSION"
-          
+
           # Compare versions using node
           IS_HIGHER=$(node -e "const semver = require('semver'); console.log(semver.gt('$CURRENT_VERSION', '$LATEST_VERSION') ? 'true' : 'false')")
           echo "is_higher=$IS_HIGHER" >> $GITHUB_OUTPUT
-          
+
           if [ "$IS_HIGHER" = "true" ]; then
             echo "Current version is higher than latest published version. Proceeding with publish."
           else
@@ -249,13 +263,13 @@ jobs:
           echo "No published version found. This appears to be the first publish."
           echo "is_higher=true" >> $GITHUB_OUTPUT
         fi
-      
+
     - name: Publish to npm
       if: steps.check_version.outputs.is_higher == 'true'
       run: npm publish --access public
       env:
         NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        
+
     - name: Skip publish - version not higher
       if: steps.check_version.outputs.is_higher != 'true'
       run: echo "✅ Build successful but publish skipped - current version is not higher than the latest published version."
