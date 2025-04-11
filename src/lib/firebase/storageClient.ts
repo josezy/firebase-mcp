@@ -18,12 +18,79 @@ import * as os from 'os';
 import { logger } from '../../utils/logger';
 
 /**
+ * Detects content type from file path or data URL
+ *
+ * @param {string} input - The file path or data URL
+ * @returns {string} The detected content type
+ */
+export function detectContentType(input: string): string {
+  // Handle data URLs
+  if (input.startsWith('data:')) {
+    const matches = input.match(/^data:([\w-+\/]+)(?:;[\w-]+=([\w-]+))*(?:;(base64))?,.*$/);
+    if (matches && matches[1]) {
+      return matches[1].trim();
+    }
+    return 'text/plain';
+  }
+
+  // Handle file extensions
+  const extension = input.split('.').pop()?.toLowerCase();
+  if (!extension) {
+    return 'text/plain';
+  }
+
+  const mimeTypes: Record<string, string> = {
+    txt: 'text/plain',
+    html: 'text/html',
+    css: 'text/css',
+    js: 'application/javascript',
+    json: 'application/json',
+    png: 'image/png',
+    jpg: 'image/jpeg',
+    jpeg: 'image/jpeg',
+    gif: 'image/gif',
+    svg: 'image/svg+xml',
+    pdf: 'application/pdf',
+    doc: 'application/msword',
+    docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    xls: 'application/vnd.ms-excel',
+    xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    ppt: 'application/vnd.ms-powerpoint',
+    pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+    csv: 'text/csv',
+    md: 'text/markdown',
+    yaml: 'application/yaml',
+    yml: 'application/yaml',
+    mp3: 'audio/mpeg',
+    mp4: 'video/mp4',
+    webm: 'video/webm',
+    ogg: 'audio/ogg',
+    wav: 'audio/wav',
+    ico: 'image/x-icon',
+    ttf: 'font/ttf',
+    woff: 'font/woff',
+    woff2: 'font/woff2',
+    eot: 'application/vnd.ms-fontobject',
+    otf: 'font/otf',
+    zip: 'application/zip',
+    xml: 'application/xml',
+  };
+
+  return mimeTypes[extension] || 'text/plain';
+}
+
+/**
  * Sanitizes a file path for better URL compatibility
  *
  * @param {string} filePath - The original file path
  * @returns {string} The sanitized file path
  */
-function sanitizeFilePath(filePath: string): string {
+export function sanitizeFilePath(filePath: string | undefined | null): string {
+  // Handle null or undefined values
+  if (!filePath) {
+    return '';
+  }
+
   // Replace spaces with hyphens
   let sanitized = filePath.replace(/\s+/g, '-');
 
@@ -51,7 +118,7 @@ function sanitizeFilePath(filePath: string): string {
  * @param {string} filePath - The path to the file in storage
  * @returns {string} A permanent public URL for the file
  */
-function getPublicUrl(bucketName: string, filePath: string): string {
+export function getPublicUrl(bucketName: string, filePath: string): string {
   // Encode the file path properly for URLs
   const encodedFilePath = encodeURIComponent(filePath);
 

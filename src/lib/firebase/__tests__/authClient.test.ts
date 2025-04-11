@@ -237,5 +237,50 @@ describe('Authentication Client', () => {
         authSpy.mockRestore();
       }
     });
+
+    // Test successful user retrieval by email
+    it('should successfully retrieve a user by email', async () => {
+      // Skip if not using emulator
+      if (process.env.USE_FIREBASE_EMULATOR !== 'true') {
+        console.log('Skipping email test in non-emulator environment');
+        return;
+      }
+
+      // Create a mock user response
+      const mockUser = {
+        uid: 'test-uid-email',
+        email: 'test-email@example.com',
+        emailVerified: true,
+        disabled: false,
+        metadata: {
+          lastSignInTime: new Date().toISOString(),
+          creationTime: new Date().toISOString(),
+        },
+        providerData: [],
+      };
+
+      // Mock the getUserByEmail method
+      const getUserByEmailSpy = vi
+        .spyOn(admin.auth(), 'getUserByEmail')
+        .mockResolvedValue(mockUser as any);
+
+      try {
+        // Call the function with an email
+        const result = await getUserByIdOrEmail('test-email@example.com');
+
+        // Verify the result
+        expect(result.isError).toBeUndefined();
+        expect(result.content[0].type).toBe('json');
+
+        // Parse the response
+        const userData = JSON.parse(result.content[0].text);
+        expect(userData).toEqual(mockUser);
+
+        // Verify the correct method was called
+        expect(getUserByEmailSpy).toHaveBeenCalledWith('test-email@example.com');
+      } finally {
+        getUserByEmailSpy.mockRestore();
+      }
+    });
   });
 });

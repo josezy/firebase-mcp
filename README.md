@@ -394,13 +394,15 @@ The server is structured into three main components:
 
 ```
 src/
-├── index.ts              # Server entry point
+├── .github/workflows/         # CI workflows
+├── index.ts                  # Server entry point
+├── __tests__                 # Tests
 └── lib/
     └── firebase/
-        ├── authClient.ts       # Authentication operations
+        ├── authClient.ts     # Authentication operations
         ├── firebaseConfig.ts   # Firebase configuration
-        ├── firestoreClient.ts  # Firestore operations
-        └── storageClient.ts    # Storage operations
+        ├── firestoreClient.ts # Firestore operations
+        └── storageClient.ts  # Storage operations
 ```
 
 Each client module implements specific Firebase service operations and exposes them as MCP tools.
