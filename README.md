@@ -93,8 +93,6 @@ When using this server with any MCP client, follow these best practices for file
 
 ## Setup
 
-> The easiest way to install the Firebase MCP server is to simply feed your LLM client (like Cline) the [llms-install.md](./llms-install.md) file.
-
 ### 1. Firebase Configuration
 
 - Go to [Firebase Console](https://console.firebase.google.com)
@@ -115,9 +113,8 @@ The server requires the following environment variables:
 Add the server configuration to your MCP settings file:
 
 - Claude Desktop: `~/Library/Application Support/Claude/claude_desktop_config.json`
+- Augment: `~/Library/Application Support/Code/User/settings.json`
 - Cursor: `[project root]/.cursor/mcp.json`
-- Roo Code (VS Code Extension): (`~/Library/Application Support/Code/User/globalStorage/rooveterinaryinc.roo-cline/settings/cline_mcp_settings.json`)
-- Cline (VS Code Extension): `~/Library/Application Support/Code/User/globalStorage/saoudrizwan.claude-dev/settings/cline_mcp_settings.json`
 
 MCP Servers can be installed manually or at runtime via npx (recommended). How you install determines your configuration:
 
