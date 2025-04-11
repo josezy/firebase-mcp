@@ -1077,6 +1077,67 @@ describe('Storage Client', () => {
         const fileInfo = JSON.parse(result.content[0].text);
         expect(fileInfo).toHaveProperty('name', 'repaired-base64.png');
         expect(fileInfo).toHaveProperty('contentType', 'image/png');
+
+        // Verify the file was saved with a buffer (repaired base64)
+        expect(mockFile.save).toHaveBeenCalledWith(
+          expect.any(Buffer),
+          expect.objectContaining({
+            metadata: expect.objectContaining({
+              contentType: 'image/png',
+            }),
+          })
+        );
+      } finally {
+        // Restore the original implementation
+        bucketSpy.mockRestore();
+      }
+    });
+
+    // Test handling of base64 data with padding issues
+    it('should repair base64 data with padding issues', async () => {
+      // First ensure we have a valid bucket
+      const bucket = await getBucket();
+      expect(bucket).not.toBeNull();
+
+      // Create a base64 string with padding issues
+      const paddingIssueBase64 =
+        'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJA'; // Missing padding
+
+      // Mock metadata result
+      const mockMetadata = {
+        name: 'padding-fixed.png',
+        size: 1024,
+        contentType: 'image/png',
+        updated: new Date().toISOString(),
+      };
+
+      // Mock the file methods
+      const mockFile = {
+        save: vi.fn().mockResolvedValue(undefined),
+        getMetadata: vi.fn().mockResolvedValue([mockMetadata]),
+        getSignedUrl: vi.fn().mockResolvedValue(['https://example.com/signed-url']),
+      };
+
+      // Mock the bucket to return our mock file
+      const bucketSpy = vi.spyOn(admin.storage(), 'bucket').mockReturnValue({
+        file: vi.fn().mockReturnValue(mockFile),
+        name: 'test-bucket',
+      } as any);
+
+      try {
+        // Call the function
+        const result = await uploadFile('padding-fixed.png', paddingIssueBase64);
+
+        // Verify the result is not an error
+        expect(result.isError).toBeUndefined();
+
+        // Parse the response
+        const fileInfo = JSON.parse(result.content[0].text);
+        expect(fileInfo).toHaveProperty('name', 'padding-fixed.png');
+        expect(fileInfo).toHaveProperty('contentType', 'image/png');
+
+        // Verify the file was saved
+        expect(mockFile.save).toHaveBeenCalled();
       } finally {
         // Restore the original implementation
         bucketSpy.mockRestore();
@@ -2218,6 +2279,20 @@ describe('Storage Client', () => {
       expect(detectContentType('data:application/octet-stream;base64,abc')).toBe(
         'application/octet-stream'
       );
+    });
+
+    it('should handle invalid or malformed data URLs', () => {
+      // Test invalid data URLs
+      expect(detectContentType('data:')).toBe('text/plain');
+      expect(detectContentType('data:image')).toBe('text/plain');
+      expect(detectContentType('data:image/')).toBe('text/plain');
+      expect(detectContentType('data:image/png')).toBe('text/plain');
+      expect(detectContentType('data:image/png;')).toBe('text/plain');
+      expect(detectContentType('data:image/png;base64')).toBe('text/plain');
+      expect(detectContentType('data:;base64,abc')).toBe('text/plain');
+      // The regex in detectContentType extracts 'invalid' as the content type
+      expect(detectContentType('data:invalid;base64,abc')).toBe('invalid');
+      expect(detectContentType('data:text/plain;invalid,abc')).toBe('text/plain');
     });
   });
 
