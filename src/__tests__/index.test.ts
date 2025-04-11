@@ -124,6 +124,45 @@ describe('Firebase MCP Server', () => {
       firestore: () => ({
         collection: vi.fn().mockReturnValue(collectionMock),
       }),
+      auth: () => ({
+        getUser: vi.fn().mockResolvedValue({
+          uid: 'test-uid',
+          email: 'test@example.com',
+          emailVerified: true,
+          disabled: false,
+          metadata: {
+            lastSignInTime: new Date().toISOString(),
+            creationTime: new Date().toISOString(),
+          },
+          providerData: [],
+        }),
+        getUserByEmail: vi.fn().mockResolvedValue({
+          uid: 'test-uid',
+          email: 'test@example.com',
+          emailVerified: true,
+          disabled: false,
+          metadata: {
+            lastSignInTime: new Date().toISOString(),
+            creationTime: new Date().toISOString(),
+          },
+          providerData: [],
+        }),
+      }),
+      storage: () => ({
+        bucket: vi.fn().mockReturnValue({
+          file: vi.fn().mockReturnValue({
+            save: vi.fn().mockResolvedValue(undefined),
+            getMetadata: vi.fn().mockResolvedValue([{
+              name: 'test-file.txt',
+              size: 1024,
+              contentType: 'text/plain',
+              updated: new Date().toISOString(),
+            }]),
+            getSignedUrl: vi.fn().mockResolvedValue(['https://example.com/signed-url']),
+          }),
+          name: 'test-bucket',
+        }),
+      }),
     };
 
     // Set up mocks BEFORE importing the module
@@ -296,6 +335,39 @@ describe('Firebase MCP Server', () => {
   describe('Tool Execution', () => {
     // eslint-disable-next-line @typescript-eslint/no-unsafe-function-type
     let callToolHandler: Function;
+
+    // Mock for storage client module
+    const mockStorageClient = {
+      uploadFile: vi.fn().mockResolvedValue({
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify({
+              name: 'test-file.txt',
+              size: 1024,
+              contentType: 'text/plain',
+              downloadUrl: 'https://firebasestorage.googleapis.com/v0/b/test-bucket/o/test-file.txt?alt=media',
+              temporaryUrl: 'https://example.com/signed-url',
+            }),
+          },
+        ],
+      }),
+      uploadFileFromUrl: vi.fn().mockResolvedValue({
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify({
+              name: 'test-file.txt',
+              size: 1024,
+              contentType: 'text/plain',
+              downloadUrl: 'https://firebasestorage.googleapis.com/v0/b/test-bucket/o/test-file.txt?alt=media',
+              temporaryUrl: 'https://example.com/signed-url',
+              sourceUrl: 'https://example.com/source.txt',
+            }),
+          },
+        ],
+      }),
+    };
 
     beforeEach(async () => {
       await import('../index');
