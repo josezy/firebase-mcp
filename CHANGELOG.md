@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Permanent public URLs** for uploaded files that don't expire and work with public storage rules
 - Support for direct local file path uploads - no need for Base64 conversion
 - Improved guidance for all MCP clients on file upload best practices
+- Automatic filename sanitization for better URL compatibility
 - Response formatting metadata for MCP clients to display user-friendly file upload information
 - Improved error handling for storage operations
 - Automatic content type detection for uploaded files

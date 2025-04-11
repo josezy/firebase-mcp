@@ -383,8 +383,17 @@ The project uses Vitest for testing. Tests can be run against Firebase emulators
 3. **Run Tests**
 
    ```bash
+   # Run tests with emulator
    npm run test:emulator
+
+   # Run tests with coverage report
+   npm run test:coverage
+
+   # Run tests with coverage report in emulator mode
+   npm run test:coverage:emulator
    ```
+
+   The coverage reports will be generated in the `coverage` directory. The project aims to maintain at least 90% code coverage across all metrics (lines, statements, functions, and branches).
 
 ### Architecture
 
