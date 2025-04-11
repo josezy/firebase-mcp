@@ -24,7 +24,14 @@ jobs:
       with:
         node-version: ${{ matrix.node-version }}
         cache: 'npm'
-    - run: npm ci
+    - name: Install dependencies
+      run: |
+        # Clean install with fallback for platform-specific optional dependencies
+        npm ci || (
+          echo "Initial npm ci failed, trying with clean install..."
+          rm -rf node_modules package-lock.json
+          npm install
+        )
 
     - name: Add format:check script if needed
       run: |
