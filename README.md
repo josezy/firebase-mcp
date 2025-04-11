@@ -49,7 +49,7 @@ MCP clients can upload files to Firebase Storage in three ways:
      `content`: `data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAA...`
    }
    ```
-   The server will automatically detect the content type from the data URL prefix. This method works (most of the time) fo small files but clients will struggle with larger files due to the base64 encoding string length.
+   The server will automatically detect the content type from the data URL prefix. This method works (most of the time) for small files but **clients may struggle with larger files due to the base64 encoding string length**.
 
 3. **Plain Text** (For text files)
    ```ts
@@ -90,10 +90,6 @@ When using this server with any MCP client, follow these best practices for file
    ```
 
 > ‼️ **Important**: Document references (like `/document/123` or internal references) are not directly accessible by external tools. Always use the actual file path or URL for reliable uploads. ‼️
-
-## 🔍 Also Available: Collection Group Queries
-
-Firebase MCP supports querying sub-collections (collection groups) in Firestore! This allows you to query across all sub-collections with the same name, regardless of their parent document - making it easy to search across your entire database hierarchy with a single query. Perfect for cross-document searches, activity feeds, and unified dashboards.
 
 ## Setup
 
