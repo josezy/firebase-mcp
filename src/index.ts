@@ -298,7 +298,7 @@ class FirebaseMcpServer {
         {
           name: 'storage_upload',
           description:
-            'Upload a file to Firebase Storage. Supports local file paths, base64 data, or plain text.',
+            'Upload a file to Firebase Storage. Supports local file paths (preferred for binary files), base64 data, or plain text.',
           inputSchema: {
             type: 'object',
             properties: {
