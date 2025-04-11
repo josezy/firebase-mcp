@@ -143,6 +143,7 @@ jobs:
         fi
 
     - name: Start Firebase Emulators and Run Tests
+      id: run_tests
       run: |
         # Start the emulators in the background
         firebase emulators:start --project demo-project > emulator.log 2>&1 &
@@ -197,8 +198,8 @@ jobs:
         # Run build
         npm run build --if-present
 
-        # Run all tests with Vitest using emulator mode explicitly
-        npm run test:emulator
+        # Run all tests with coverage in emulator mode
+        npm run test:coverage:emulator
 
         # Store the test result
         TEST_RESULT=$?
@@ -206,8 +207,60 @@ jobs:
         # Kill the emulator process
         kill $EMULATOR_PID
 
+        # Extract coverage thresholds from vitest.config.ts
+        if [ -d "coverage" ]; then
+          # Using a more robust approach with node to read the config file
+          echo "Extracting coverage thresholds from vitest.config.ts..."
+          THRESHOLDS=$(node -e "const fs = require('fs'); const content = fs.readFileSync('vitest.config.ts', 'utf8'); const thresholdsMatch = content.match(/thresholds:\s*{([^}]*)}/s); if (thresholdsMatch) { const thresholds = thresholdsMatch[1].match(/([a-z]+):\s*(\d+)/g).reduce((acc, curr) => { const [key, value] = curr.split(':').map(s => s.trim()); acc[key] = value; return acc; }, {}); console.log(JSON.stringify(thresholds)); }")
+
+          # Parse the JSON output
+          LINES_THRESHOLD=$(echo $THRESHOLDS | jq -r '.lines')
+          STATEMENTS_THRESHOLD=$(echo $THRESHOLDS | jq -r '.statements')
+          FUNCTIONS_THRESHOLD=$(echo $THRESHOLDS | jq -r '.functions')
+          BRANCHES_THRESHOLD=$(echo $THRESHOLDS | jq -r '.branches')
+
+          # Create a summary of the coverage report
+          echo "Coverage Summary:" > coverage-summary.txt
+          echo "Thresholds: Lines: ${LINES_THRESHOLD}%, Statements: ${STATEMENTS_THRESHOLD}%, Functions: ${FUNCTIONS_THRESHOLD}%, Branches: ${BRANCHES_THRESHOLD}%" >> coverage-summary.txt
+          echo "" >> coverage-summary.txt
+          echo "Actual Coverage:" >> coverage-summary.txt
+          cat coverage/coverage-summary.json | jq '.total | {lines, statements, functions, branches}' >> coverage-summary.txt
+
+          # Get current coverage values
+          LINE_COVERAGE=$(cat coverage/coverage-summary.json | jq -r '.total.lines.pct')
+          STATEMENT_COVERAGE=$(cat coverage/coverage-summary.json | jq -r '.total.statements.pct')
+          FUNCTION_COVERAGE=$(cat coverage/coverage-summary.json | jq -r '.total.functions.pct')
+          BRANCH_COVERAGE=$(cat coverage/coverage-summary.json | jq -r '.total.branches.pct')
+
+          echo "Coverage thresholds from vitest.config.ts:"
+          echo "Lines: $LINES_THRESHOLD%, Statements: $STATEMENTS_THRESHOLD%, Functions: $FUNCTIONS_THRESHOLD%, Branches: $BRANCHES_THRESHOLD%"
+          echo ""
+          echo "Current coverage:"
+          echo "Lines: $LINE_COVERAGE%, Statements: $STATEMENT_COVERAGE%, Functions: $FUNCTION_COVERAGE%, Branches: $BRANCH_COVERAGE%"
+
+          # Only warn about coverage for now, don't fail the build
+          if (( $(echo "$LINE_COVERAGE < $LINES_THRESHOLD" | bc -l) )) || \
+             (( $(echo "$STATEMENT_COVERAGE < $STATEMENTS_THRESHOLD" | bc -l) )) || \
+             (( $(echo "$FUNCTION_COVERAGE < $FUNCTIONS_THRESHOLD" | bc -l) )) || \
+             (( $(echo "$BRANCH_COVERAGE < $BRANCHES_THRESHOLD" | bc -l) )); then
+            echo "⚠️ Warning: Code coverage is below thresholds defined in vitest.config.ts"
+          else
+            echo "✅ Code coverage meets or exceeds thresholds defined in vitest.config.ts"
+          fi
+        fi
+
         # Return the test result
         exit $TEST_RESULT
+
+    - name: Upload Coverage Report
+      if: always() && steps.run_tests.outcome == 'success'
+      uses: actions/upload-artifact@v3
+      with:
+        name: coverage-report
+        path: |
+          coverage/
+          coverage-summary.txt
+        retention-days: 30
 
   publish:
     name: Publish to npm
