@@ -1,4 +1,11 @@
-import { listDirectoryFiles, getFileInfo, getBucketName, getBucket, uploadFile, uploadFileFromUrl } from '../storageClient';
+import {
+  listDirectoryFiles,
+  getFileInfo,
+  getBucketName,
+  getBucket,
+  uploadFile,
+  uploadFileFromUrl,
+} from '../storageClient';
 import { admin } from '../firebaseConfig';
 import * as admin_module from 'firebase-admin';
 import * as fs from 'fs';

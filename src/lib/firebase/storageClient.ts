@@ -12,6 +12,9 @@
 import * as admin from 'firebase-admin';
 import axios from 'axios';
 import { getProjectId } from './firebaseConfig';
+import * as fs from 'fs';
+import * as path from 'path';
+import * as os from 'os';
 
 /**
  * Generate a permanent public URL for a file in Firebase Storage
@@ -228,7 +231,7 @@ export async function getFileInfo(filePath: string): Promise<StorageResponse> {
       downloadUrl: publicUrl, // Use the permanent URL as the primary download URL
       temporaryUrl: signedUrl, // Include the temporary URL as a backup
       bucket: bucket.name,
-      path: filePath
+      path: filePath,
     };
 
     return {
@@ -324,10 +327,12 @@ export async function uploadFile(
                 console.log('Base64 data was repaired successfully');
               } catch (error) {
                 return {
-                  content: [{
-                    type: 'error',
-                    text: `Invalid base64 data: The data appears to be truncated or corrupted. LLMs like Claude sometimes have issues with large base64 strings. Try using a local file path or URL instead.`
-                  }],
+                  content: [
+                    {
+                      type: 'error',
+                      text: `Invalid base64 data: The data appears to be truncated or corrupted. LLMs like Claude sometimes have issues with large base64 strings. Try using a local file path or URL instead.`,
+                    },
+                  ],
                   isError: true,
                 };
               }
@@ -341,15 +346,26 @@ export async function uploadFile(
           }
 
           // Validate buffer for images
-          if (detectedContentType && detectedContentType.startsWith('image/') && buffer.length < 10) {
+          if (
+            detectedContentType &&
+            detectedContentType.startsWith('image/') &&
+            buffer.length < 10
+          ) {
             return {
-              content: [{ type: 'error', text: 'Invalid image data: too small to be a valid image' }],
+              content: [
+                { type: 'error', text: 'Invalid image data: too small to be a valid image' },
+              ],
               isError: true,
             };
           }
         } catch (error) {
           return {
-            content: [{ type: 'error', text: `Invalid data encoding: ${error instanceof Error ? error.message : 'Unknown error'}` }],
+            content: [
+              {
+                type: 'error',
+                text: `Invalid data encoding: ${error instanceof Error ? error.message : 'Unknown error'}`,
+              },
+            ],
             isError: true,
           };
         }
@@ -359,137 +375,32 @@ export async function uploadFile(
           isError: true,
         };
       }
-    } else if (content.startsWith('/antml:document')) {
-      // Handle Anthropic Claude document references
-      try {
-        // Extract document index if available
-        const docIndexMatch = content.match(/\/antml:document(?:\[(\d+)\])?/);
-        const docIndex = docIndexMatch && docIndexMatch[1] ? parseInt(docIndexMatch[1]) : 1;
-
-        // Look for the document in common Claude upload locations
-        const fs = require('fs');
-        const path = require('path');
-        const os = require('os');
-
-        // Common locations where Claude might store uploaded documents
-        const possibleLocations = [
-          // macOS locations
-          path.join(os.homedir(), 'Library', 'Application Support', 'Claude', 'uploads'),
-          path.join(os.homedir(), 'Library', 'Caches', 'Claude', 'uploads'),
-          path.join(os.homedir(), 'Downloads', 'Claude'),
-          // Windows locations
-          path.join(os.homedir(), 'AppData', 'Local', 'Claude', 'uploads'),
-          path.join(os.homedir(), 'AppData', 'Roaming', 'Claude', 'uploads'),
-          path.join(os.homedir(), 'Downloads', 'Claude'),
-          // Linux locations
-          path.join(os.homedir(), '.config', 'Claude', 'uploads'),
-          path.join(os.homedir(), '.cache', 'Claude', 'uploads'),
-          // Temp directories
-          path.join(os.tmpdir(), 'Claude'),
-          os.tmpdir(),
-        ];
-
-        // Try to find the most recently modified file that matches the expected pattern
-        let foundFiles = [];
-        for (const location of possibleLocations) {
-          if (fs.existsSync(location)) {
-            try {
-              const files = fs.readdirSync(location);
-              for (const file of files) {
-                const filePath = path.join(location, file);
-                try {
-                  const stats = fs.statSync(filePath);
-                  if (stats.isFile() && stats.mtimeMs > Date.now() - 3600000) { // Files modified in the last hour
-                    foundFiles.push({
-                      path: filePath,
-                      mtime: stats.mtimeMs
-                    });
-                  }
-                } catch (e) {
-                  // Skip files we can't access
-                  continue;
-                }
-              }
-            } catch (e) {
-              // Skip directories we can't read
-              continue;
-            }
-          }
-        }
-
-        // Sort by modification time (newest first)
-        foundFiles.sort((a, b) => b.mtime - a.mtime);
-
-        // If we found files, use the most recent one or the one matching the index
-        if (foundFiles.length > 0) {
-          const fileToUse = docIndex <= foundFiles.length ? foundFiles[docIndex - 1] : foundFiles[0];
-
-          // Read the file and process it
-          buffer = fs.readFileSync(fileToUse.path);
-
-          // Try to detect content type from file extension
-          if (!detectedContentType) {
-            const extension = path.extname(fileToUse.path).toLowerCase().substring(1);
-            const mimeTypes: Record<string, string> = {
-              'txt': 'text/plain',
-              'html': 'text/html',
-              'css': 'text/css',
-              'js': 'application/javascript',
-              'json': 'application/json',
-              'png': 'image/png',
-              'jpg': 'image/jpeg',
-              'jpeg': 'image/jpeg',
-              'gif': 'image/gif',
-              'svg': 'image/svg+xml',
-              'pdf': 'application/pdf',
-              'doc': 'application/msword',
-              'docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-              'xls': 'application/vnd.ms-excel',
-              'xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-              'ppt': 'application/vnd.ms-powerpoint',
-              'pptx': 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-              'csv': 'text/csv',
-              'md': 'text/markdown',
-            };
-            detectedContentType = mimeTypes[extension] || 'application/octet-stream';
-          }
-
-          console.log(`Found Claude document at ${fileToUse.path} with type ${detectedContentType}`);
-        } else {
-          // If we couldn't find any files, return a helpful error
-          return {
-            content: [{
-              type: 'error',
-              text: `Could not locate the Claude document referenced by '/antml:document${docIndex > 1 ? '[' + docIndex + ']' : ''}'.
-
-Please try one of these approaches instead:
-1. Use a direct file path like '/path/to/file.pdf'
-2. Upload the file to a web location and use storage_upload_from_url
-3. Extract the text content from the document and upload it as plain text`
-            }],
-            isError: true,
-          };
-        }
-      } catch (error) {
-        return {
-          content: [{
+    } else if (content.startsWith('/antml:document') || content.includes('document reference')) {
+      // Handle document references that can't be directly accessed
+      return {
+        content: [
+          {
             type: 'error',
-            text: `Error processing Claude document reference: ${error instanceof Error ? error.message : 'Unknown error'}
+            text: `‼️ Document references cannot be directly accessed by external tools. ‼️
 
-Please try one of these approaches instead:
-1. Use a direct file path like '/path/to/file.pdf'
-2. Upload the file to a web location and use storage_upload_from_url
-3. Extract the text content from the document and upload it as plain text`
-          }],
-          isError: true,
-        };
-      }
-    } else if (content.startsWith('/') && require('fs').existsSync(content)) {
+Instead, please use one of these approaches:
+
+1. Use a direct file path to the document on your system (fastest and most reliable):
+   Example: '/Users/username/Downloads/document.pdf'
+
+2. Upload the file to a web location and use storage_upload_from_url:
+   Example: 'https://example.com/document.pdf'
+
+3. For text files, extract the content and upload it as plain text.
+
+‼️ Path-based uploads work great for all file types and are extremely fast. ‼️`,
+          },
+        ],
+        isError: true,
+      };
+    } else if (content.startsWith('/') && fs.existsSync(content)) {
       // Handle local file paths - NEW FEATURE
       try {
-        const fs = require('fs');
-        const path = require('path');
-
         // Read the file as binary
         buffer = fs.readFileSync(content);
 
@@ -497,31 +408,36 @@ Please try one of these approaches instead:
         if (!detectedContentType) {
           const extension = path.extname(content).toLowerCase().substring(1);
           const mimeTypes: Record<string, string> = {
-            'txt': 'text/plain',
-            'html': 'text/html',
-            'css': 'text/css',
-            'js': 'application/javascript',
-            'json': 'application/json',
-            'png': 'image/png',
-            'jpg': 'image/jpeg',
-            'jpeg': 'image/jpeg',
-            'gif': 'image/gif',
-            'svg': 'image/svg+xml',
-            'pdf': 'application/pdf',
-            'doc': 'application/msword',
-            'docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-            'xls': 'application/vnd.ms-excel',
-            'xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-            'ppt': 'application/vnd.ms-powerpoint',
-            'pptx': 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-            'csv': 'text/csv',
-            'md': 'text/markdown',
+            txt: 'text/plain',
+            html: 'text/html',
+            css: 'text/css',
+            js: 'application/javascript',
+            json: 'application/json',
+            png: 'image/png',
+            jpg: 'image/jpeg',
+            jpeg: 'image/jpeg',
+            gif: 'image/gif',
+            svg: 'image/svg+xml',
+            pdf: 'application/pdf',
+            doc: 'application/msword',
+            docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            xls: 'application/vnd.ms-excel',
+            xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            ppt: 'application/vnd.ms-powerpoint',
+            pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+            csv: 'text/csv',
+            md: 'text/markdown',
           };
           detectedContentType = mimeTypes[extension] || 'application/octet-stream';
         }
       } catch (error) {
         return {
-          content: [{ type: 'error', text: `Error reading local file: ${error instanceof Error ? error.message : 'Unknown error'}` }],
+          content: [
+            {
+              type: 'error',
+              text: `Error reading local file: ${error instanceof Error ? error.message : 'Unknown error'}`,
+            },
+          ],
           isError: true,
         };
       }
@@ -567,7 +483,7 @@ Please try one of these approaches instead:
       downloadUrl: publicUrl, // Use the permanent URL as the primary download URL
       temporaryUrl: signedUrl, // Include the temporary URL as a backup
       bucket: bucket.name,
-      path: filePath
+      path: filePath,
     };
 
     return {
@@ -621,25 +537,26 @@ export async function uploadFileFromUrl(
         responseType: responseType,
         headers: {
           // Accept any content type, but prefer binary for images
-          'Accept': isImage ? 'image/*' : '*/*',
+          Accept: isImage ? 'image/*' : '*/*',
         },
       });
 
       // Use provided content type or get from response headers
-      let detectedContentType = contentType || response.headers['content-type'] || 'application/octet-stream';
+      let detectedContentType =
+        contentType || response.headers['content-type'] || 'application/octet-stream';
 
       // For images without content type, try to detect from URL extension
       if (!detectedContentType.includes('/') && isImage) {
         const extension = url.split('.').pop()?.toLowerCase();
         if (extension) {
           const mimeTypes: Record<string, string> = {
-            'jpg': 'image/jpeg',
-            'jpeg': 'image/jpeg',
-            'png': 'image/png',
-            'gif': 'image/gif',
-            'bmp': 'image/bmp',
-            'webp': 'image/webp',
-            'svg': 'image/svg+xml'
+            jpg: 'image/jpeg',
+            jpeg: 'image/jpeg',
+            png: 'image/png',
+            gif: 'image/gif',
+            bmp: 'image/bmp',
+            webp: 'image/webp',
+            svg: 'image/svg+xml',
           };
           detectedContentType = mimeTypes[extension] || detectedContentType;
         }
@@ -651,7 +568,12 @@ export async function uploadFileFromUrl(
       // Validate buffer for images
       if (detectedContentType.startsWith('image/') && buffer.length < 10) {
         return {
-          content: [{ type: 'error', text: 'Invalid image data: downloaded file is too small to be a valid image' }],
+          content: [
+            {
+              type: 'error',
+              text: 'Invalid image data: downloaded file is too small to be a valid image',
+            },
+          ],
           isError: true,
         };
       }
@@ -692,7 +614,7 @@ export async function uploadFileFromUrl(
         temporaryUrl: signedUrl, // Include the temporary URL as a backup
         sourceUrl: url,
         bucket: bucket.name,
-        path: filePath
+        path: filePath,
       };
 
       return {

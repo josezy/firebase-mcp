@@ -297,7 +297,8 @@ class FirebaseMcpServer {
         },
         {
           name: 'storage_upload',
-          description: 'Upload a file to Firebase Storage. Supports local file paths, base64 data, or plain text.',
+          description:
+            'Upload a file to Firebase Storage. Supports local file paths, base64 data, or plain text.',
           inputSchema: {
             type: 'object',
             properties: {
@@ -307,11 +308,13 @@ class FirebaseMcpServer {
               },
               content: {
                 type: 'string',
-                description: 'Can be: 1) A local file path (e.g., "/path/to/file.pdf") - RECOMMENDED for binary files like PDFs and images, 2) A Claude document reference (e.g., "/antml:document" or "/antml:document[1]") - for files attached to the conversation, 3) A data URL (e.g., "data:image/png;base64,...") - may have issues with large files, or 4) Plain text content.',
+                description:
+                  'Can be: 1) A local file path (e.g., "/path/to/file.pdf") - RECOMMENDED for all file types, especially binary files like PDFs and images, 2) A data URL (e.g., "data:image/png;base64,...") - may have issues with large files, or 3) Plain text content. Note: Document references are not directly accessible - always use the actual file path instead.',
               },
               contentType: {
                 type: 'string',
-                description: 'Optional MIME type. If not provided, it will be automatically detected',
+                description:
+                  'Optional MIME type. If not provided, it will be automatically detected',
               },
               metadata: {
                 type: 'object',
@@ -321,13 +324,15 @@ class FirebaseMcpServer {
             required: ['filePath', 'content'],
           },
           responseFormatting: {
-            template: '## File Successfully Uploaded! 📁\n\nYour file has been uploaded to Firebase Storage:\n\n**File Details:**\n- **Name:** {{name}}\n- **Size:** {{size}} bytes\n- **Type:** {{contentType}}\n- **Last Updated:** {{updated}}\n- **Bucket:** {{bucket}}\n\n**[Click here to download your file]({{downloadUrl}})**\n\nThis is a permanent URL that will not expire.',
-            fields: ['name', 'size', 'contentType', 'updated', 'bucket', 'downloadUrl']
+            template:
+              '## File Successfully Uploaded! 📁\n\nYour file has been uploaded to Firebase Storage:\n\n**File Details:**\n- **Name:** {{name}}\n- **Size:** {{size}} bytes\n- **Type:** {{contentType}}\n- **Last Updated:** {{updated}}\n- **Bucket:** {{bucket}}\n\n**[Click here to download your file]({{downloadUrl}})**\n\nThis is a permanent URL that will not expire.',
+            fields: ['name', 'size', 'contentType', 'updated', 'bucket', 'downloadUrl'],
           },
         },
         {
           name: 'storage_upload_from_url',
-          description: 'Upload a file to Firebase Storage from an external URL. Perfect for images, documents, or any file accessible via URL.',
+          description:
+            'Upload a file to Firebase Storage from an external URL. Perfect for images, documents, or any file accessible via URL.',
           inputSchema: {
             type: 'object',
             properties: {
@@ -337,11 +342,13 @@ class FirebaseMcpServer {
               },
               url: {
                 type: 'string',
-                description: 'The source URL to download from (e.g., "https://example.com/image.jpg"). For GitHub files, use the raw URL (add ?raw=true)',
+                description:
+                  'The source URL to download from (e.g., "https://example.com/image.jpg"). For GitHub files, use the raw URL (add ?raw=true)',
               },
               contentType: {
                 type: 'string',
-                description: 'Optional MIME type. If not provided, it will be automatically detected from the URL or response headers',
+                description:
+                  'Optional MIME type. If not provided, it will be automatically detected from the URL or response headers',
               },
               metadata: {
                 type: 'object',
@@ -351,8 +358,17 @@ class FirebaseMcpServer {
             required: ['filePath', 'url'],
           },
           responseFormatting: {
-            template: '## File Successfully Uploaded from URL! 📁\n\nYour file has been uploaded to Firebase Storage:\n\n**File Details:**\n- **Name:** {{name}}\n- **Size:** {{size}} bytes\n- **Type:** {{contentType}}\n- **Last Updated:** {{updated}}\n- **Source URL:** {{sourceUrl}}\n- **Bucket:** {{bucket}}\n\n**[Click here to download your file]({{downloadUrl}})**\n\nThis is a permanent URL that will not expire.',
-            fields: ['name', 'size', 'contentType', 'updated', 'sourceUrl', 'bucket', 'downloadUrl']
+            template:
+              '## File Successfully Uploaded from URL! 📁\n\nYour file has been uploaded to Firebase Storage:\n\n**File Details:**\n- **Name:** {{name}}\n- **Size:** {{size}} bytes\n- **Type:** {{contentType}}\n- **Last Updated:** {{updated}}\n- **Source URL:** {{sourceUrl}}\n- **Bucket:** {{bucket}}\n\n**[Click here to download your file]({{downloadUrl}})**\n\nThis is a permanent URL that will not expire.',
+            fields: [
+              'name',
+              'size',
+              'contentType',
+              'updated',
+              'sourceUrl',
+              'bucket',
+              'downloadUrl',
+            ],
           },
         },
         {

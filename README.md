@@ -40,9 +40,7 @@ MCP clients can upload files to Firebase Storage in three ways:
    ```
    The server will read the file, detect its content type, and upload it to Firebase Storage.
 
-   > **Note for LLM MCP Clients**: This method is strongly recommended for binary files like PDFs and images when working with Claude and other LLMs, as they often struggle with base64 encoding of large binary files.
-   >
-   > **Special Note for Claude**: When working with PDFs and other documents, Claude can use its internal document references like `/antml:document` or `/antml:document[1]` (for multiple attachments). The server will automatically search for the attached files in common Claude upload locations.
+   > ‼️ **Note for MCP Clients**: This method is strongly recommended for all file types, especially binary files like PDFs and images. Path-based uploads are faster and more reliable than base64 encoding, which often fails with large files. ‼️
 
 2. **Base64 Data URL** (For binary data)
    ```json
@@ -63,24 +61,35 @@ MCP clients can upload files to Firebase Storage in three ways:
 
 The server handles all the necessary conversion and content type detection, making it easy for MCP clients to upload files without complex preprocessing.
 
-#### Claude Document Attachment Support
+#### Best Practices for File Uploads
 
-This server includes special support for Claude's document attachments:
+When using this server with any MCP client, follow these best practices for file uploads:
 
-1. **Direct References**: Claude can use `/antml:document` to reference files attached to the conversation
-2. **Multiple Attachments**: For multiple files, Claude can use indexed references like `/antml:document[1]`, `/antml:document[2]`, etc.
-3. **Automatic Discovery**: The server will search common Claude upload locations to find the referenced files
-4. **Content Type Detection**: File types are automatically detected based on file extensions
+1. **Use Direct File Paths**: Always use the full path to files on your system
+   ```json
+   {
+     `filePath`: `financial_report.pdf`,
+     `content`: `/Users/username/Downloads/report.pdf`
+   }
+   ```
 
-Example usage with Claude:
-```json
-{
-  `filePath`: `financial_report.pdf`,
-  `content`: `/antml:document[1]`
-}
-```
+2. **URL-Based Uploads**: For files available online, use the `storage_upload_from_url` tool
+   ```json
+   {
+     `filePath`: `financial_report.pdf`,
+     `url`: `https://example.com/report.pdf`
+   }
+   ```
 
-If Claude cannot find the attached document, it will provide helpful error messages with alternative approaches.
+3. **Text Extraction**: For text-based files, Claude can extract and upload the content directly
+   ```json
+   {
+     `filePath`: `report_summary.txt`,
+     `content`: `This quarterly report shows a 15% increase in revenue...`
+   }
+   ```
+
+> ‼️ **Important**: Document references (like `/document/123` or internal references) are not directly accessible by external tools. Always use the actual file path or URL for reliable uploads. ‼️
 
 ## 🔍 Also Available: Collection Group Queries
 
