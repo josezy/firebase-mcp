@@ -304,7 +304,8 @@ class FirebaseMcpServer {
             properties: {
               filePath: {
                 type: 'string',
-                description: 'The destination path in Firebase Storage (e.g., "images/logo.png")',
+                description:
+                  'The destination path in Firebase Storage (e.g., "images/logo.png"). If necessary, rename files for optimal URL compatibility (e.g., "my-document.pdf" rather than "My Document.pdf").',
               },
               content: {
                 type: 'string',
@@ -338,7 +339,8 @@ class FirebaseMcpServer {
             properties: {
               filePath: {
                 type: 'string',
-                description: 'The destination path in Firebase Storage (e.g., "images/photo.jpg")',
+                description:
+                  'The destination path in Firebase Storage (e.g., "images/photo.jpg"). If necessary, rename files for optimal URL compatibility (e.g., "my-document.pdf" rather than "My Document.pdf").',
               },
               url: {
                 type: 'string',

@@ -18,6 +18,33 @@ import * as os from 'os';
 import { logger } from '../../utils/logger';
 
 /**
+ * Sanitizes a file path for better URL compatibility
+ *
+ * @param {string} filePath - The original file path
+ * @returns {string} The sanitized file path
+ */
+function sanitizeFilePath(filePath: string): string {
+  // Replace spaces with hyphens
+  let sanitized = filePath.replace(/\s+/g, '-');
+
+  // Convert to lowercase
+  sanitized = sanitized.toLowerCase();
+
+  // Replace special characters with hyphens (except for periods, slashes, and underscores)
+  sanitized = sanitized.replace(/[^a-z0-9\.\/\_\-]/g, '-');
+
+  // Remove multiple consecutive hyphens
+  sanitized = sanitized.replace(/\-+/g, '-');
+
+  // Log if the path was changed
+  if (sanitized !== filePath) {
+    logger.info(`File path sanitized for better URL compatibility: "${filePath}" → "${sanitized}"`);
+  }
+
+  return sanitized;
+}
+
+/**
  * Generate a permanent public URL for a file in Firebase Storage
  *
  * @param {string} bucketName - The name of the storage bucket
@@ -275,6 +302,8 @@ export async function uploadFile(
   contentType?: string,
   metadata?: Record<string, any>
 ): Promise<StorageResponse> {
+  // Sanitize the file path for better URL compatibility
+  filePath = sanitizeFilePath(filePath);
   try {
     const bucket = await getBucket();
     if (!bucket) {
@@ -519,6 +548,8 @@ export async function uploadFileFromUrl(
   contentType?: string,
   metadata?: Record<string, any>
 ): Promise<StorageResponse> {
+  // Sanitize the file path for better URL compatibility
+  filePath = sanitizeFilePath(filePath);
   try {
     const bucket = await getBucket();
     if (!bucket) {
