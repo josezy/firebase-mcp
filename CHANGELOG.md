@@ -12,6 +12,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - New storage upload capabilities:
   - `storage_upload`: Upload files directly to Firebase Storage from text or base64 content
   - `storage_upload_from_url`: Upload files to Firebase Storage from external URLs
+- **Permanent public URLs** for uploaded files that don't expire and work with public storage rules
+- Support for direct local file path uploads - no need for Base64 conversion
+- Support for Claude document attachments via `/antml:document` references
 - Response formatting metadata for MCP clients to display user-friendly file upload information
 - Improved error handling for storage operations
 - Automatic content type detection for uploaded files
@@ -19,7 +22,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Fixed response format issues with storage tools to comply with MCP protocol standards
+- Fixed image encoding issues to ensure uploaded images display correctly
 - Improved error handling for invalid base64 data
+- Enhanced MIME type detection for files uploaded from URLs
 
 ## [1.3.2] - 2024-04-10
 

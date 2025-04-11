@@ -25,7 +25,62 @@ Firebase MCP now supports direct file uploads to Firebase Storage! The new versi
 - **`storage_upload`**: Upload files directly from text or base64 content with automatic content type detection
 - **`storage_upload_from_url`**: Import files from external URLs with a single command
 
-Both tools include user-friendly response formatting to display file information and download links in a clean, readable format.
+Both tools provide **permanent public URLs** that don't expire, making it easier to share and access your uploaded files. They also include user-friendly response formatting to display file information and download links in a clean, readable format.
+
+#### File Upload Options for MCP Clients
+
+MCP clients can upload files to Firebase Storage in three ways:
+
+1. **Direct Local File Path** (RECOMMENDED for binary files)
+   ```json
+   {
+     `filePath`: `my-image.png`,
+     `content`: `/path/to/local/image.png`
+   }
+   ```
+   The server will read the file, detect its content type, and upload it to Firebase Storage.
+
+   > **Note for LLM MCP Clients**: This method is strongly recommended for binary files like PDFs and images when working with Claude and other LLMs, as they often struggle with base64 encoding of large binary files.
+   >
+   > **Special Note for Claude**: When working with PDFs and other documents, Claude can use its internal document references like `/antml:document` or `/antml:document[1]` (for multiple attachments). The server will automatically search for the attached files in common Claude upload locations.
+
+2. **Base64 Data URL** (For binary data)
+   ```json
+   {
+     `filePath`: `my-image.png`,
+     `content`: `data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAA...`
+   }
+   ```
+   The server will automatically detect the content type from the data URL prefix.
+
+3. **Plain Text** (For text files)
+   ```json
+   {
+     `filePath`: `readme.md`,
+     `content`: `# My README\n\nThis is a markdown file.`
+   }
+   ```
+
+The server handles all the necessary conversion and content type detection, making it easy for MCP clients to upload files without complex preprocessing.
+
+#### Claude Document Attachment Support
+
+This server includes special support for Claude's document attachments:
+
+1. **Direct References**: Claude can use `/antml:document` to reference files attached to the conversation
+2. **Multiple Attachments**: For multiple files, Claude can use indexed references like `/antml:document[1]`, `/antml:document[2]`, etc.
+3. **Automatic Discovery**: The server will search common Claude upload locations to find the referenced files
+4. **Content Type Detection**: File types are automatically detected based on file extensions
+
+Example usage with Claude:
+```json
+{
+  `filePath`: `financial_report.pdf`,
+  `content`: `/antml:document[1]`
+}
+```
+
+If Claude cannot find the attached document, it will provide helpful error messages with alternative approaches.
 
 ## 🔍 Also Available: Collection Group Queries
 

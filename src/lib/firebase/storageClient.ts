@@ -13,6 +13,22 @@ import * as admin from 'firebase-admin';
 import axios from 'axios';
 import { getProjectId } from './firebaseConfig';
 
+/**
+ * Generate a permanent public URL for a file in Firebase Storage
+ *
+ * @param {string} bucketName - The name of the storage bucket
+ * @param {string} filePath - The path to the file in storage
+ * @returns {string} A permanent public URL for the file
+ */
+function getPublicUrl(bucketName: string, filePath: string): string {
+  // Encode the file path properly for URLs
+  const encodedFilePath = encodeURIComponent(filePath);
+
+  // Return the permanent URL without a token
+  // This format works for public files and doesn't expire
+  return `https://firebasestorage.googleapis.com/v0/b/${bucketName}/o/${encodedFilePath}?alt=media`;
+}
+
 //const storage = admin.storage().bucket();
 
 /**
@@ -196,7 +212,10 @@ export async function getFileInfo(filePath: string): Promise<StorageResponse> {
     }
 
     const [metadata] = await file.getMetadata();
-    const [url] = await file.getSignedUrl({
+
+    // Generate both permanent and temporary URLs
+    const publicUrl = getPublicUrl(bucket.name, filePath);
+    const [signedUrl] = await file.getSignedUrl({
       action: 'read',
       expires: Date.now() + 15 * 60 * 1000, // URL expires in 15 minutes
     });
@@ -206,7 +225,10 @@ export async function getFileInfo(filePath: string): Promise<StorageResponse> {
       size: metadata.size,
       contentType: metadata.contentType,
       updated: metadata.updated,
-      downloadUrl: url,
+      downloadUrl: publicUrl, // Use the permanent URL as the primary download URL
+      temporaryUrl: signedUrl, // Include the temporary URL as a backup
+      bucket: bucket.name,
+      path: filePath
     };
 
     return {
@@ -225,7 +247,7 @@ export async function getFileInfo(filePath: string): Promise<StorageResponse> {
  * Uploads a file to Firebase Storage from content (text, base64, etc.)
  *
  * @param {string} filePath - The destination path in Firebase Storage
- * @param {string} content - The file content (text or base64 encoded data)
+ * @param {string} content - The file content (text or base64 encoded data) or a local file path
  * @param {string} [contentType] - Optional MIME type. If not provided, it will be inferred
  * @param {object} [metadata] - Optional additional metadata
  * @returns {Promise<StorageResponse>} MCP-formatted response with file info
@@ -238,6 +260,10 @@ export async function getFileInfo(filePath: string): Promise<StorageResponse> {
  * @example
  * // Upload from base64
  * const result = await uploadFile('images/logo.png', 'data:image/png;base64,iVBORw0...');
+ *
+ * @example
+ * // Upload from a local file path
+ * const result = await uploadFile('images/logo.png', '/path/to/local/image.png');
  */
 export async function uploadFile(
   filePath: string,
@@ -259,20 +285,71 @@ export async function uploadFile(
 
     // Handle base64 data URLs
     if (content.startsWith('data:')) {
-      const matches = content.match(/^data:([A-Za-z-+/]+);base64,(.+)$/);
+      // More flexible regex to handle various data URL formats
+      const matches = content.match(/^data:([\w-+\/]+)(?:;[\w-]+=([\w-]+))*(?:;(base64))?,(.*)$/);
 
-      if (matches && matches.length === 3) {
+      if (matches) {
         // If content type not provided, use the one from data URL
-        if (!detectedContentType) {
-          detectedContentType = matches[1];
+        if (!detectedContentType && matches[1]) {
+          detectedContentType = matches[1].trim();
         }
 
+        // Check if this is base64 encoded
+        const isBase64 = matches[3] === 'base64';
+        const data = matches[4] || '';
+
         try {
-          // Extract base64 data and convert to buffer
-          buffer = Buffer.from(matches[2], 'base64');
+          // Extract data and convert to buffer
+          if (isBase64) {
+            // Validate base64 data before processing
+            // Check if the base64 string is valid and not truncated
+            const isValidBase64 = /^[A-Za-z0-9+/]*={0,2}$/.test(data);
+
+            if (!isValidBase64) {
+              // Try to repair common base64 issues
+              let repairedData = data;
+
+              // Remove any non-base64 characters
+              repairedData = repairedData.replace(/[^A-Za-z0-9+/=]/g, '');
+
+              // Ensure proper padding
+              const paddingNeeded = (4 - (repairedData.length % 4)) % 4;
+              repairedData += '='.repeat(paddingNeeded);
+
+              try {
+                // Try with the repaired data
+                buffer = Buffer.from(repairedData, 'base64');
+
+                // If we get here, the repair worked
+                console.log('Base64 data was repaired successfully');
+              } catch (error) {
+                return {
+                  content: [{
+                    type: 'error',
+                    text: `Invalid base64 data: The data appears to be truncated or corrupted. LLMs like Claude sometimes have issues with large base64 strings. Try using a local file path or URL instead.`
+                  }],
+                  isError: true,
+                };
+              }
+            } else {
+              // Handle valid base64 data
+              buffer = Buffer.from(data, 'base64');
+            }
+          } else {
+            // Handle URL-encoded data
+            buffer = Buffer.from(decodeURIComponent(data));
+          }
+
+          // Validate buffer for images
+          if (detectedContentType && detectedContentType.startsWith('image/') && buffer.length < 10) {
+            return {
+              content: [{ type: 'error', text: 'Invalid image data: too small to be a valid image' }],
+              isError: true,
+            };
+          }
         } catch (error) {
           return {
-            content: [{ type: 'error', text: 'Invalid base64 data' }],
+            content: [{ type: 'error', text: `Invalid data encoding: ${error instanceof Error ? error.message : 'Unknown error'}` }],
             isError: true,
           };
         }
@@ -282,8 +359,174 @@ export async function uploadFile(
           isError: true,
         };
       }
+    } else if (content.startsWith('/antml:document')) {
+      // Handle Anthropic Claude document references
+      try {
+        // Extract document index if available
+        const docIndexMatch = content.match(/\/antml:document(?:\[(\d+)\])?/);
+        const docIndex = docIndexMatch && docIndexMatch[1] ? parseInt(docIndexMatch[1]) : 1;
+
+        // Look for the document in common Claude upload locations
+        const fs = require('fs');
+        const path = require('path');
+        const os = require('os');
+
+        // Common locations where Claude might store uploaded documents
+        const possibleLocations = [
+          // macOS locations
+          path.join(os.homedir(), 'Library', 'Application Support', 'Claude', 'uploads'),
+          path.join(os.homedir(), 'Library', 'Caches', 'Claude', 'uploads'),
+          path.join(os.homedir(), 'Downloads', 'Claude'),
+          // Windows locations
+          path.join(os.homedir(), 'AppData', 'Local', 'Claude', 'uploads'),
+          path.join(os.homedir(), 'AppData', 'Roaming', 'Claude', 'uploads'),
+          path.join(os.homedir(), 'Downloads', 'Claude'),
+          // Linux locations
+          path.join(os.homedir(), '.config', 'Claude', 'uploads'),
+          path.join(os.homedir(), '.cache', 'Claude', 'uploads'),
+          // Temp directories
+          path.join(os.tmpdir(), 'Claude'),
+          os.tmpdir(),
+        ];
+
+        // Try to find the most recently modified file that matches the expected pattern
+        let foundFiles = [];
+        for (const location of possibleLocations) {
+          if (fs.existsSync(location)) {
+            try {
+              const files = fs.readdirSync(location);
+              for (const file of files) {
+                const filePath = path.join(location, file);
+                try {
+                  const stats = fs.statSync(filePath);
+                  if (stats.isFile() && stats.mtimeMs > Date.now() - 3600000) { // Files modified in the last hour
+                    foundFiles.push({
+                      path: filePath,
+                      mtime: stats.mtimeMs
+                    });
+                  }
+                } catch (e) {
+                  // Skip files we can't access
+                  continue;
+                }
+              }
+            } catch (e) {
+              // Skip directories we can't read
+              continue;
+            }
+          }
+        }
+
+        // Sort by modification time (newest first)
+        foundFiles.sort((a, b) => b.mtime - a.mtime);
+
+        // If we found files, use the most recent one or the one matching the index
+        if (foundFiles.length > 0) {
+          const fileToUse = docIndex <= foundFiles.length ? foundFiles[docIndex - 1] : foundFiles[0];
+
+          // Read the file and process it
+          buffer = fs.readFileSync(fileToUse.path);
+
+          // Try to detect content type from file extension
+          if (!detectedContentType) {
+            const extension = path.extname(fileToUse.path).toLowerCase().substring(1);
+            const mimeTypes: Record<string, string> = {
+              'txt': 'text/plain',
+              'html': 'text/html',
+              'css': 'text/css',
+              'js': 'application/javascript',
+              'json': 'application/json',
+              'png': 'image/png',
+              'jpg': 'image/jpeg',
+              'jpeg': 'image/jpeg',
+              'gif': 'image/gif',
+              'svg': 'image/svg+xml',
+              'pdf': 'application/pdf',
+              'doc': 'application/msword',
+              'docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+              'xls': 'application/vnd.ms-excel',
+              'xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+              'ppt': 'application/vnd.ms-powerpoint',
+              'pptx': 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+              'csv': 'text/csv',
+              'md': 'text/markdown',
+            };
+            detectedContentType = mimeTypes[extension] || 'application/octet-stream';
+          }
+
+          console.log(`Found Claude document at ${fileToUse.path} with type ${detectedContentType}`);
+        } else {
+          // If we couldn't find any files, return a helpful error
+          return {
+            content: [{
+              type: 'error',
+              text: `Could not locate the Claude document referenced by '/antml:document${docIndex > 1 ? '[' + docIndex + ']' : ''}'.
+
+Please try one of these approaches instead:
+1. Use a direct file path like '/path/to/file.pdf'
+2. Upload the file to a web location and use storage_upload_from_url
+3. Extract the text content from the document and upload it as plain text`
+            }],
+            isError: true,
+          };
+        }
+      } catch (error) {
+        return {
+          content: [{
+            type: 'error',
+            text: `Error processing Claude document reference: ${error instanceof Error ? error.message : 'Unknown error'}
+
+Please try one of these approaches instead:
+1. Use a direct file path like '/path/to/file.pdf'
+2. Upload the file to a web location and use storage_upload_from_url
+3. Extract the text content from the document and upload it as plain text`
+          }],
+          isError: true,
+        };
+      }
+    } else if (content.startsWith('/') && require('fs').existsSync(content)) {
+      // Handle local file paths - NEW FEATURE
+      try {
+        const fs = require('fs');
+        const path = require('path');
+
+        // Read the file as binary
+        buffer = fs.readFileSync(content);
+
+        // If content type not provided, try to detect from file extension
+        if (!detectedContentType) {
+          const extension = path.extname(content).toLowerCase().substring(1);
+          const mimeTypes: Record<string, string> = {
+            'txt': 'text/plain',
+            'html': 'text/html',
+            'css': 'text/css',
+            'js': 'application/javascript',
+            'json': 'application/json',
+            'png': 'image/png',
+            'jpg': 'image/jpeg',
+            'jpeg': 'image/jpeg',
+            'gif': 'image/gif',
+            'svg': 'image/svg+xml',
+            'pdf': 'application/pdf',
+            'doc': 'application/msword',
+            'docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'xls': 'application/vnd.ms-excel',
+            'xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'ppt': 'application/vnd.ms-powerpoint',
+            'pptx': 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+            'csv': 'text/csv',
+            'md': 'text/markdown',
+          };
+          detectedContentType = mimeTypes[extension] || 'application/octet-stream';
+        }
+      } catch (error) {
+        return {
+          content: [{ type: 'error', text: `Error reading local file: ${error instanceof Error ? error.message : 'Unknown error'}` }],
+          isError: true,
+        };
+      }
     } else {
-      // Treat as plain text if not a data URL
+      // Treat as plain text if not a data URL or local file
       buffer = Buffer.from(content);
 
       // Default to text/plain if content type not provided
@@ -308,7 +551,10 @@ export async function uploadFile(
 
     // Get file info including download URL
     const [fileMetadata] = await file.getMetadata();
-    const [url] = await file.getSignedUrl({
+
+    // Generate both permanent and temporary URLs
+    const publicUrl = getPublicUrl(bucket.name, filePath);
+    const [signedUrl] = await file.getSignedUrl({
       action: 'read',
       expires: Date.now() + 15 * 60 * 1000, // URL expires in 15 minutes
     });
@@ -318,7 +564,10 @@ export async function uploadFile(
       size: fileMetadata.size,
       contentType: fileMetadata.contentType,
       updated: fileMetadata.updated,
-      downloadUrl: url,
+      downloadUrl: publicUrl, // Use the permanent URL as the primary download URL
+      temporaryUrl: signedUrl, // Include the temporary URL as a backup
+      bucket: bucket.name,
+      path: filePath
     };
 
     return {
@@ -364,18 +613,48 @@ export async function uploadFileFromUrl(
 
     // Fetch file from URL
     try {
+      // Set appropriate response type and headers based on expected content
+      const isImage = url.match(/\.(jpg|jpeg|png|gif|bmp|webp|svg)$/i) !== null;
+      const responseType = 'arraybuffer'; // Always use arraybuffer for binary data
+
       const response = await axios.get(url, {
-        responseType: 'arraybuffer',
+        responseType: responseType,
         headers: {
-          'Accept': 'application/octet-stream',
+          // Accept any content type, but prefer binary for images
+          'Accept': isImage ? 'image/*' : '*/*',
         },
       });
 
       // Use provided content type or get from response headers
-      const detectedContentType = contentType || response.headers['content-type'] || 'application/octet-stream';
+      let detectedContentType = contentType || response.headers['content-type'] || 'application/octet-stream';
+
+      // For images without content type, try to detect from URL extension
+      if (!detectedContentType.includes('/') && isImage) {
+        const extension = url.split('.').pop()?.toLowerCase();
+        if (extension) {
+          const mimeTypes: Record<string, string> = {
+            'jpg': 'image/jpeg',
+            'jpeg': 'image/jpeg',
+            'png': 'image/png',
+            'gif': 'image/gif',
+            'bmp': 'image/bmp',
+            'webp': 'image/webp',
+            'svg': 'image/svg+xml'
+          };
+          detectedContentType = mimeTypes[extension] || detectedContentType;
+        }
+      }
 
       // Create buffer from response data
       const buffer = Buffer.from(response.data);
+
+      // Validate buffer for images
+      if (detectedContentType.startsWith('image/') && buffer.length < 10) {
+        return {
+          content: [{ type: 'error', text: 'Invalid image data: downloaded file is too small to be a valid image' }],
+          isError: true,
+        };
+      }
 
       // Create file reference
       const file = bucket.file(filePath);
@@ -396,7 +675,10 @@ export async function uploadFileFromUrl(
 
       // Get file info including download URL
       const [fileMetadata] = await file.getMetadata();
-      const [downloadUrl] = await file.getSignedUrl({
+
+      // Generate both permanent and temporary URLs
+      const publicUrl = getPublicUrl(bucket.name, filePath);
+      const [signedUrl] = await file.getSignedUrl({
         action: 'read',
         expires: Date.now() + 15 * 60 * 1000, // URL expires in 15 minutes
       });
@@ -406,8 +688,11 @@ export async function uploadFileFromUrl(
         size: fileMetadata.size,
         contentType: fileMetadata.contentType,
         updated: fileMetadata.updated,
-        downloadUrl,
+        downloadUrl: publicUrl, // Use the permanent URL as the primary download URL
+        temporaryUrl: signedUrl, // Include the temporary URL as a backup
         sourceUrl: url,
+        bucket: bucket.name,
+        path: filePath
       };
 
       return {
