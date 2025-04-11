@@ -23,7 +23,7 @@ function initializeFirebase() {
       process.env.FIREBASE_AUTH_EMULATOR_HOST = '127.0.0.1:9099';
       process.env.FIREBASE_STORAGE_EMULATOR_HOST = '127.0.0.1:9199';
       console.log('Using Firebase emulator suite');
-      
+
       // When using emulators, we don't need a real service account
       if (admin.apps.length === 0) {
         admin.initializeApp({
@@ -32,18 +32,18 @@ function initializeFirebase() {
         });
         console.log('Firebase initialized for testing with emulators');
       }
-      
+
       return admin;
     }
-    
+
     // For non-emulator mode, we need a real service account
     const serviceAccountPath = SERVICE_ACCOUNT_KEY_PATH;
-    
+
     // Check if service account file exists
     if (!fs.existsSync(serviceAccountPath)) {
       throw new Error(`Service account key file not found at ${serviceAccountPath}. Set SERVICE_ACCOUNT_KEY_PATH or use USE_FIREBASE_EMULATOR=true.`);
     }
-    
+
     const serviceAccount = JSON.parse(fs.readFileSync(serviceAccountPath, 'utf8'));
 
     // Check if Firebase is already initialized
@@ -125,4 +125,14 @@ afterAll(async () => {
 console.log = vi.fn((message) => process.stdout.write(message + '\n'));
 console.info = vi.fn((message) => process.stdout.write(message + '\n'));
 console.warn = vi.fn((message) => process.stdout.write(message + '\n'));
-console.error = vi.fn((message) => process.stderr.write(message + '\n')); 
+console.error = vi.fn((message) => process.stderr.write(message + '\n'));
+
+// Mock logger
+vi.mock('../src/utils/logger', () => ({
+  logger: {
+    debug: vi.fn(),
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+  }
+}));

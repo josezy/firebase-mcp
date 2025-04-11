@@ -16,15 +16,82 @@ The [Model Context Protocol (MCP)](https://github.com/modelcontextprotocol) is a
 - **Firestore**: Document database operations
 - **Storage**: File storage and retrieval
 
-The server exposes Firebase services through MCP tools, making them accessible to LLM clients including [Claude Desktop](https://claude.ai/download), [Cursor](https://www.cursor.com/), [Roo Code](https://github.com/RooVetGit/Roo-Code), and [Cline](https://cline.bot/), while handling authentication and connection management.
+The server exposes Firebase services through MCP tools, making them accessible to LLM clients including [Claude Desktop](https://claude.ai/download), [Augment](https://docs.augmentcode.com/setup-augment/mcp#about-model-context-protocol-servers), [VS Code](https://code.visualstudio.com/docs/copilot/chat/mcp-servers), [Cursor](https://www.cursor.com/), and others, while handling authentication and connection management.
 
-## 🔥 New in v1.3.0: Collection Group Queries
+## 🔥 New in v1.3.3: Storage Upload Features
 
-Firebase MCP now supports querying sub-collections (collection groups) in Firestore! This allows you to query across all sub-collections with the same name, regardless of their parent document - making it easy to search across your entire database hierarchy with a single query. Perfect for cross-document searches, activity feeds, and unified dashboards.
+Firebase MCP now supports direct file uploads to Firebase Storage! Version 1.3.3 introduces two new tools:
+
+- **`storage_upload`**: Upload files directly from text or base64 content with automatic content type detection
+- **`storage_upload_from_url`**: Import files from external URLs with a single command
+
+Both tools provide **permanent public URLs** that don't expire, making it easier to share and access your uploaded files. They also include user-friendly response formatting to display file information and download links in a clean, readable format.
+
+#### File Upload Options for MCP Clients
+
+MCP clients can upload files to Firebase Storage in three ways:
+
+1. **Direct Local File Path** (RECOMMENDED for binary files)
+   ```ts
+   {
+     `filePath`: `my-image.png`,
+     `content`: `/path/to/local/image.png`
+   }
+   ```
+   The server will read the file, detect its content type, and upload it to Firebase Storage.
+
+   > ‼️ **Note for MCP Clients**: This method is strongly recommended for all file types, especially binary files like PDFs and images. Path-based uploads are faster and more reliable than base64 encoding, which often fails with large files. MCP clients are made aware of this recommendation via the tool description. ‼️
+
+2. **Base64 Data URL** (For binary data)
+   ```ts
+   {
+     `filePath`: `my-image.png`,
+     `content`: `data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAA...`
+   }
+   ```
+   The server will automatically detect the content type from the data URL prefix. This method works (most of the time) for small files but **clients may struggle with larger files due to the base64 encoding string length**.
+
+3. **Plain Text** (For text files)
+   ```ts
+   {
+     `filePath`: `readme.md`,
+     `content`: `# My README\n\nThis is a markdown file.`
+   }
+   ```
+
+The server handles all the necessary conversion and content type detection, making it easy for MCP clients to upload files without complex preprocessing.
+
+#### Best Practices for File Uploads
+
+When using this server with any MCP client, follow these best practices for file uploads:
+
+1. **Use Direct File Paths**: Always use the full path to files on your system
+   ```ts
+   {
+     `filePath`: `financial_report.pdf`,
+     `content`: `/Users/username/Downloads/report.pdf`
+   }
+   ```
+
+2. **URL-Based Uploads**: For files available online, use the `storage_upload_from_url` tool
+   ```ts
+   {
+     `filePath`: `financial_report.pdf`,
+     `url`: `https://example.com/report.pdf`
+   }
+   ```
+
+3. **Text Extraction**: For text-based files, Claude can extract and upload the content directly
+   ```ts
+   {
+     `filePath`: `report_summary.txt`,
+     `content`: `This quarterly report shows a 15% increase in revenue...`
+   }
+   ```
+
+> ‼️ **Important**: Document references (like `/document/123` or internal references) are not directly accessible by external tools. Always use the actual file path or URL for reliable uploads. ‼️
 
 ## Setup
-
-> The easiest way to install the Firebase MCP server is to simply feed your LLM client (like Cline) the [llms-install.md](./llms-install.md) file.
 
 ### 1. Firebase Configuration
 
@@ -46,9 +113,8 @@ The server requires the following environment variables:
 Add the server configuration to your MCP settings file:
 
 - Claude Desktop: `~/Library/Application Support/Claude/claude_desktop_config.json`
+- Augment: `~/Library/Application Support/Code/User/settings.json`
 - Cursor: `[project root]/.cursor/mcp.json`
-- Roo Code (VS Code Extension): (`~/Library/Application Support/Code/User/globalStorage/rooveterinaryinc.roo-cline/settings/cline_mcp_settings.json`)
-- Cline (VS Code Extension): `~/Library/Application Support/Code/User/globalStorage/saoudrizwan.claude-dev/settings/cline_mcp_settings.json`
 
 MCP Servers can be installed manually or at runtime via npx (recommended). How you install determines your configuration:
 
@@ -113,7 +179,7 @@ To make sure everything is working, simply prompt your client: `Please run throu
 
 - `auth_get_user`: Get user details by ID or email
 
-  ```typescript
+  ```ts
   {
     identifier: string // User ID or email address
   }
@@ -123,7 +189,7 @@ To make sure everything is working, simply prompt your client: `Please run throu
 
 - `firestore_add_document`: Add a document to a collection
 
-  ```typescript
+  ```ts
   {
     collection: string,
     data: object
@@ -132,7 +198,7 @@ To make sure everything is working, simply prompt your client: `Please run throu
 
 - `firestore_list_collections`: List available collections
 
-  ```typescript
+  ```ts
   {
     documentPath?: string, // Optional parent document path
     limit?: number,        // Default: 20
@@ -142,7 +208,7 @@ To make sure everything is working, simply prompt your client: `Please run throu
 
 - `firestore_list_documents`: List documents with optional filtering
 
-  ```typescript
+  ```ts
   {
     collection: string,
     filters?: Array<{
@@ -157,7 +223,7 @@ To make sure everything is working, simply prompt your client: `Please run throu
 
 - `firestore_get_document`: Get a specific document
 
-  ```typescript
+  ```ts
   {
     collection: string,
     id: string
@@ -166,7 +232,7 @@ To make sure everything is working, simply prompt your client: `Please run throu
 
 - `firestore_update_document`: Update an existing document
 
-  ```typescript
+  ```ts
   {
     collection: string,
     id: string,
@@ -176,7 +242,7 @@ To make sure everything is working, simply prompt your client: `Please run throu
 
 - `firestore_delete_document`: Delete a document
 
-  ```typescript
+  ```ts
   {
     collection: string,
     id: string
@@ -185,7 +251,7 @@ To make sure everything is working, simply prompt your client: `Please run throu
 
 - `firestore_query_collection_group`: Query documents across all sub-collections 🆕
 
-  ```typescript
+  ```ts
   {
     collectionId: string,       // The collection ID to query across all documents
     filters?: Array<{           // Optional filters
@@ -206,7 +272,7 @@ To make sure everything is working, simply prompt your client: `Please run throu
 
 - `storage_list_files`: List files in a directory
 
-  ```typescript
+  ```ts
   {
     directoryPath?: string, // Optional path, defaults to root
     pageSize?: number,      // Number of items per page, defaults to 10
@@ -216,11 +282,71 @@ To make sure everything is working, simply prompt your client: `Please run throu
 
 - `storage_get_file_info`: Get file metadata and download URL
 
-  ```typescript
+  ```ts
   {
     filePath: string // Path to the file in storage
   }
   ```
+
+- `storage_upload`: Upload a file to Firebase Storage from content (text, base64, etc.)
+
+  ```ts
+  {
+    filePath: string,                  // The destination path in Firebase Storage
+    content: string,                   // The file content (text or base64 encoded data)
+    contentType?: string,              // Optional MIME type. If not provided, it will be inferred
+    metadata?: Record<string, any>     // Optional additional metadata
+  }
+  ```
+
+- `storage_upload_from_url`: Upload a file to Firebase Storage from an external URL
+
+  ```ts
+  {
+    filePath: string,                  // The destination path in Firebase Storage
+    url: string,                       // The source URL to download from
+    contentType?: string,              // Optional MIME type. If not provided, it will be inferred from response headers
+    metadata?: Record<string, any>     // Optional additional metadata
+  }
+  ```
+
+### Response Formatting for MCP Clients
+
+When displaying responses from the Firebase MCP server, clients should format the responses in a user-friendly way. This is especially important for storage operations where users benefit from seeing file information in a structured format with clickable links.
+
+#### Example: Formatting Storage Upload Responses
+
+Raw response from `storage_upload` or `storage_upload_from_url`:
+```json
+{
+  "name": "example.txt",
+  "size": "1024",
+  "contentType": "text/plain",
+  "updated": "2025-04-10T22:37:10.290Z",
+  "downloadUrl": "https://storage.googleapis.com/bucket/example.txt?token..."
+}
+```
+
+Recommended client formatting:
+```markdown
+## File Successfully Uploaded! 📁
+
+Your file has been uploaded to Firebase Storage:
+
+**File Details:**
+- **Name:** example.txt
+- **Size:** 1024 bytes
+- **Type:** text/plain
+- **Last Updated:** April 10, 2025 at 22:37:10 UTC
+
+**[Click here to download your file](https://storage.googleapis.com/bucket/example.txt?token...)**
+```
+
+This formatting provides a better user experience by:
+1. Clearly indicating success with a descriptive heading
+2. Organizing file details in an easy-to-read format
+3. Providing a clickable download link
+4. Using appropriate formatting and emoji for visual appeal
 
 ## Development
 
@@ -250,8 +376,17 @@ The project uses Vitest for testing. Tests can be run against Firebase emulators
 3. **Run Tests**
 
    ```bash
+   # Run tests with emulator
    npm run test:emulator
+
+   # Run tests with coverage report
+   npm run test:coverage
+
+   # Run tests with coverage report in emulator mode
+   npm run test:coverage:emulator
    ```
+
+   The coverage reports will be generated in the `coverage` directory. The project aims to maintain at least 90% code coverage across all metrics (lines, statements, functions, and branches).
 
 ### Architecture
 
@@ -259,13 +394,15 @@ The server is structured into three main components:
 
 ```
 src/
-├── index.ts              # Server entry point
+├── .github/workflows/         # CI workflows
+├── index.ts                  # Server entry point
+├── __tests__                 # Tests
 └── lib/
     └── firebase/
-        ├── authClient.ts       # Authentication operations
+        ├── authClient.ts     # Authentication operations
         ├── firebaseConfig.ts   # Firebase configuration
-        ├── firestoreClient.ts  # Firestore operations
-        └── storageClient.ts    # Storage operations
+        ├── firestoreClient.ts # Firestore operations
+        └── storageClient.ts  # Storage operations
 ```
 
 Each client module implements specific Firebase service operations and exposes them as MCP tools.
