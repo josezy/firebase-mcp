@@ -9,7 +9,16 @@ export default defineConfig({
     coverage: {
       provider: 'v8',
       reporter: ['text', 'html', 'lcov', 'json-summary'],
-      exclude: ['node_modules/**', 'dist/**', '**/*.d.ts', '**/*.test.ts', '**/*.spec.ts'],
+      exclude: [
+        'node_modules/**',
+        'dist/**',
+        '**/*.d.ts',
+        '**/*.test.ts',
+        '**/*.spec.ts',
+        `.eslintrc.js`,
+        'vitest.config.ts',
+        'vitest.setup.ts',
+      ],
       thresholds: {
         branches: 90,
         functions: 90,
