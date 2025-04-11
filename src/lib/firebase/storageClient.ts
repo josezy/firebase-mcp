@@ -15,6 +15,7 @@ import { getProjectId } from './firebaseConfig';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
+import { logger } from '../../utils/logger';
 
 /**
  * Generate a permanent public URL for a file in Firebase Storage
@@ -66,7 +67,7 @@ export function getBucketName(projectId: string): string {
   const storageBucket = process.env.FIREBASE_STORAGE_BUCKET;
 
   if (storageBucket) {
-    console.error(`Using bucket name from environment: ${storageBucket}`);
+    logger.debug(`Using bucket name from environment: ${storageBucket}`);
     return storageBucket;
   }
 
@@ -77,7 +78,7 @@ export function getBucketName(projectId: string): string {
     process.env.NODE_ENV === 'test';
 
   if (isEmulator) {
-    console.error(`Using emulator bucket format for project: ${projectId}`);
+    logger.debug(`Using emulator bucket format for project: ${projectId}`);
     return `${projectId}.firebasestorage.app`;
   }
 
@@ -88,10 +89,10 @@ export function getBucketName(projectId: string): string {
     projectId,
   ];
 
-  console.error(
+  logger.warn(
     `No FIREBASE_STORAGE_BUCKET environment variable set. Trying default bucket names: ${possibleBucketNames.join(', ')}`
   );
-  console.error(`DEBUG: Using first bucket name: ${possibleBucketNames[0]}`);
+  logger.debug(`Using first bucket name as fallback: ${possibleBucketNames[0]}`);
   return possibleBucketNames[0]; // Default to first format
 }
 
@@ -324,7 +325,7 @@ export async function uploadFile(
                 buffer = Buffer.from(repairedData, 'base64');
 
                 // If we get here, the repair worked
-                console.log('Base64 data was repaired successfully');
+                logger.debug('Base64 data was repaired successfully');
               } catch (error) {
                 return {
                   content: [

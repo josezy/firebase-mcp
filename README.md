@@ -32,7 +32,7 @@ Both tools provide **permanent public URLs** that don't expire, making it easier
 MCP clients can upload files to Firebase Storage in three ways:
 
 1. **Direct Local File Path** (RECOMMENDED for binary files)
-   ```json
+   ```ts
    {
      `filePath`: `my-image.png`,
      `content`: `/path/to/local/image.png`
@@ -43,7 +43,7 @@ MCP clients can upload files to Firebase Storage in three ways:
    > ‼️ **Note for MCP Clients**: This method is strongly recommended for all file types, especially binary files like PDFs and images. Path-based uploads are faster and more reliable than base64 encoding, which often fails with large files. ‼️
 
 2. **Base64 Data URL** (For binary data)
-   ```json
+   ```ts
    {
      `filePath`: `my-image.png`,
      `content`: `data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAA...`
@@ -52,7 +52,7 @@ MCP clients can upload files to Firebase Storage in three ways:
    The server will automatically detect the content type from the data URL prefix.
 
 3. **Plain Text** (For text files)
-   ```json
+   ```ts
    {
      `filePath`: `readme.md`,
      `content`: `# My README\n\nThis is a markdown file.`
@@ -66,7 +66,7 @@ The server handles all the necessary conversion and content type detection, maki
 When using this server with any MCP client, follow these best practices for file uploads:
 
 1. **Use Direct File Paths**: Always use the full path to files on your system
-   ```json
+   ```ts
    {
      `filePath`: `financial_report.pdf`,
      `content`: `/Users/username/Downloads/report.pdf`
@@ -74,7 +74,7 @@ When using this server with any MCP client, follow these best practices for file
    ```
 
 2. **URL-Based Uploads**: For files available online, use the `storage_upload_from_url` tool
-   ```json
+   ```ts
    {
      `filePath`: `financial_report.pdf`,
      `url`: `https://example.com/report.pdf`
@@ -82,7 +82,7 @@ When using this server with any MCP client, follow these best practices for file
    ```
 
 3. **Text Extraction**: For text-based files, Claude can extract and upload the content directly
-   ```json
+   ```ts
    {
      `filePath`: `report_summary.txt`,
      `content`: `This quarterly report shows a 15% increase in revenue...`
@@ -186,7 +186,7 @@ To make sure everything is working, simply prompt your client: `Please run throu
 
 - `auth_get_user`: Get user details by ID or email
 
-  ```typescript
+  ```ts
   {
     identifier: string // User ID or email address
   }
@@ -196,7 +196,7 @@ To make sure everything is working, simply prompt your client: `Please run throu
 
 - `firestore_add_document`: Add a document to a collection
 
-  ```typescript
+  ```ts
   {
     collection: string,
     data: object
@@ -205,7 +205,7 @@ To make sure everything is working, simply prompt your client: `Please run throu
 
 - `firestore_list_collections`: List available collections
 
-  ```typescript
+  ```ts
   {
     documentPath?: string, // Optional parent document path
     limit?: number,        // Default: 20
@@ -215,7 +215,7 @@ To make sure everything is working, simply prompt your client: `Please run throu
 
 - `firestore_list_documents`: List documents with optional filtering
 
-  ```typescript
+  ```ts
   {
     collection: string,
     filters?: Array<{
@@ -230,7 +230,7 @@ To make sure everything is working, simply prompt your client: `Please run throu
 
 - `firestore_get_document`: Get a specific document
 
-  ```typescript
+  ```ts
   {
     collection: string,
     id: string
@@ -239,7 +239,7 @@ To make sure everything is working, simply prompt your client: `Please run throu
 
 - `firestore_update_document`: Update an existing document
 
-  ```typescript
+  ```ts
   {
     collection: string,
     id: string,
@@ -249,7 +249,7 @@ To make sure everything is working, simply prompt your client: `Please run throu
 
 - `firestore_delete_document`: Delete a document
 
-  ```typescript
+  ```ts
   {
     collection: string,
     id: string
@@ -258,7 +258,7 @@ To make sure everything is working, simply prompt your client: `Please run throu
 
 - `firestore_query_collection_group`: Query documents across all sub-collections 🆕
 
-  ```typescript
+  ```ts
   {
     collectionId: string,       // The collection ID to query across all documents
     filters?: Array<{           // Optional filters
@@ -279,7 +279,7 @@ To make sure everything is working, simply prompt your client: `Please run throu
 
 - `storage_list_files`: List files in a directory
 
-  ```typescript
+  ```ts
   {
     directoryPath?: string, // Optional path, defaults to root
     pageSize?: number,      // Number of items per page, defaults to 10
@@ -289,7 +289,7 @@ To make sure everything is working, simply prompt your client: `Please run throu
 
 - `storage_get_file_info`: Get file metadata and download URL
 
-  ```typescript
+  ```ts
   {
     filePath: string // Path to the file in storage
   }
@@ -297,7 +297,7 @@ To make sure everything is working, simply prompt your client: `Please run throu
 
 - `storage_upload`: Upload a file to Firebase Storage from content (text, base64, etc.)
 
-  ```typescript
+  ```ts
   {
     filePath: string,                  // The destination path in Firebase Storage
     content: string,                   // The file content (text or base64 encoded data)
@@ -308,7 +308,7 @@ To make sure everything is working, simply prompt your client: `Please run throu
 
 - `storage_upload_from_url`: Upload a file to Firebase Storage from an external URL
 
-  ```typescript
+  ```ts
   {
     filePath: string,                  // The destination path in Firebase Storage
     url: string,                       // The source URL to download from

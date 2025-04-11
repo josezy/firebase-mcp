@@ -15,6 +15,7 @@
 
 import * as admin from 'firebase-admin';
 import fs from 'fs';
+import { logger } from '../../utils/logger';
 
 /**
  * Initializes the Firebase Admin SDK with service account credentials.
@@ -30,9 +31,9 @@ import fs from 'fs';
  * // Initialize Firebase
  * const app = initializeFirebase();
  * if (app) {
- *   console.log('Firebase initialized successfully');
+ *   logger.info('Firebase initialized successfully');
  * } else {
- *   console.error('Firebase initialization failed');
+ *   logger.error('Firebase initialization failed');
  * }
  */
 function initializeFirebase(): admin.app.App | null {

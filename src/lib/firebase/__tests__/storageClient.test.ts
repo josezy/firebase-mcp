@@ -116,8 +116,8 @@ describe('Storage Client', () => {
     });
 
     it('should use FIREBASE_STORAGE_BUCKET when available', () => {
-      // Mock console.error to avoid noise in test output
-      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      // Mock logger.debug to avoid noise in test output
+      const loggerDebugSpy = vi.spyOn(logger, 'debug').mockImplementation(() => {});
 
       // Set environment variable
       process.env.FIREBASE_STORAGE_BUCKET = 'test-bucket-from-env';
@@ -127,15 +127,15 @@ describe('Storage Client', () => {
 
       // Verify result
       expect(result).toBe('test-bucket-from-env');
-      expect(consoleErrorSpy).toHaveBeenCalledWith(expect.stringContaining('test-bucket-from-env'));
+      expect(loggerDebugSpy).toHaveBeenCalledWith(expect.stringContaining('test-bucket-from-env'));
 
-      // Restore console.error
-      consoleErrorSpy.mockRestore();
+      // Restore logger.debug
+      loggerDebugSpy.mockRestore();
     });
 
     it('should use emulator format when in emulator environment', () => {
-      // Mock console.error to avoid noise in test output
-      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      // Mock logger.debug to avoid noise in test output
+      const loggerDebugSpy = vi.spyOn(logger, 'debug').mockImplementation(() => {});
 
       // Clear storage bucket
       delete process.env.FIREBASE_STORAGE_BUCKET;
@@ -148,17 +148,17 @@ describe('Storage Client', () => {
 
       // Verify result
       expect(result).toBe('emulator-project.firebasestorage.app');
-      expect(consoleErrorSpy).toHaveBeenCalledWith(
+      expect(loggerDebugSpy).toHaveBeenCalledWith(
         expect.stringContaining('Using emulator bucket format')
       );
 
-      // Restore console.error
-      consoleErrorSpy.mockRestore();
+      // Restore logger.debug
+      loggerDebugSpy.mockRestore();
     });
 
     it('should use USE_FIREBASE_EMULATOR flag for emulator detection', () => {
-      // Mock console.error to avoid noise in test output
-      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      // Mock logger.debug to avoid noise in test output
+      const loggerDebugSpy = vi.spyOn(logger, 'debug').mockImplementation(() => {});
 
       // Clear storage bucket and storage emulator host
       delete process.env.FIREBASE_STORAGE_BUCKET;
@@ -172,17 +172,17 @@ describe('Storage Client', () => {
 
       // Verify result
       expect(result).toBe('flag-project.firebasestorage.app');
-      expect(consoleErrorSpy).toHaveBeenCalledWith(
+      expect(loggerDebugSpy).toHaveBeenCalledWith(
         expect.stringContaining('Using emulator bucket format')
       );
 
-      // Restore console.error
-      consoleErrorSpy.mockRestore();
+      // Restore logger.debug
+      loggerDebugSpy.mockRestore();
     });
 
     it('should use test environment for emulator detection', () => {
-      // Mock console.error to avoid noise in test output
-      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      // Mock logger.debug to avoid noise in test output
+      const loggerDebugSpy = vi.spyOn(logger, 'debug').mockImplementation(() => {});
 
       // Clear all relevant environment variables
       delete process.env.FIREBASE_STORAGE_BUCKET;
@@ -197,17 +197,17 @@ describe('Storage Client', () => {
 
       // Verify result
       expect(result).toBe('test-env-project.firebasestorage.app');
-      expect(consoleErrorSpy).toHaveBeenCalledWith(
+      expect(loggerDebugSpy).toHaveBeenCalledWith(
         expect.stringContaining('Using emulator bucket format')
       );
 
-      // Restore console.error
-      consoleErrorSpy.mockRestore();
+      // Restore logger.debug
+      loggerDebugSpy.mockRestore();
     });
 
     it('should fall back to default bucket name format', () => {
-      // Mock console.error to avoid noise in test output
-      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      // Mock logger.warn to avoid noise in test output
+      const loggerWarnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => {});
 
       // Clear all relevant environment variables
       delete process.env.FIREBASE_STORAGE_BUCKET;
@@ -220,12 +220,12 @@ describe('Storage Client', () => {
 
       // Verify result
       expect(result).toBe('fallback-project.firebasestorage.app');
-      expect(consoleErrorSpy).toHaveBeenCalledWith(
+      expect(loggerWarnSpy).toHaveBeenCalledWith(
         expect.stringContaining('No FIREBASE_STORAGE_BUCKET environment variable set')
       );
 
-      // Restore console.error
-      consoleErrorSpy.mockRestore();
+      // Restore logger.warn
+      loggerWarnSpy.mockRestore();
     });
   });
 
