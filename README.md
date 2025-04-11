@@ -20,7 +20,7 @@ The server exposes Firebase services through MCP tools, making them accessible t
 
 ## 🔥 New in v1.3.3: Storage Upload Features
 
-Firebase MCP now supports direct file uploads to Firebase Storage! The new version introduces two powerful tools:
+Firebase MCP now supports direct file uploads to Firebase Storage! Version 1.3.3 introduces two new tools:
 
 - **`storage_upload`**: Upload files directly from text or base64 content with automatic content type detection
 - **`storage_upload_from_url`**: Import files from external URLs with a single command
@@ -40,7 +40,7 @@ MCP clients can upload files to Firebase Storage in three ways:
    ```
    The server will read the file, detect its content type, and upload it to Firebase Storage.
 
-   > ‼️ **Note for MCP Clients**: This method is strongly recommended for all file types, especially binary files like PDFs and images. Path-based uploads are faster and more reliable than base64 encoding, which often fails with large files. ‼️
+   > ‼️ **Note for MCP Clients**: This method is strongly recommended for all file types, especially binary files like PDFs and images. Path-based uploads are faster and more reliable than base64 encoding, which often fails with large files. MCP clients are made aware of this recommendation via the tool description. ‼️
 
 2. **Base64 Data URL** (For binary data)
    ```ts
@@ -49,7 +49,7 @@ MCP clients can upload files to Firebase Storage in three ways:
      `content`: `data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAA...`
    }
    ```
-   The server will automatically detect the content type from the data URL prefix.
+   The server will automatically detect the content type from the data URL prefix. This method works (most of the time) fo small files but clients will struggle with larger files due to the base64 encoding string length.
 
 3. **Plain Text** (For text files)
    ```ts
