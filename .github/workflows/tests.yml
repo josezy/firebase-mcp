@@ -130,7 +130,7 @@ jobs:
         }' > firebaseServiceKey.json
 
     - name: Cache Firebase Emulators
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: ~/.cache/firebase/emulators
         key: ${{ runner.os }}-firebase-emulators-${{ hashFiles('firebase.json') }}
