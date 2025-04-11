@@ -6,7 +6,7 @@
   <img width="380" height="200" src="https://glama.ai/mcp/servers/x4i8z2xmrq/badge" alt="Firebase MCP server" />
 </a>
 
-[![Firebase Tests CI](https://github.com/gannonh/firebase-mcp/actions/workflows/firebase-tests.yml/badge.svg)](https://github.com/gannonh/firebase-mcp/actions/workflows/firebase-tests.yml)
+[![Firebase Tests CI](https://github.com/gannonh/firebase-mcp/actions/workflows/tests.yml/badge.svg)](https://github.com/gannonh/firebase-mcp/actions/workflows/tests.yml)
 
 ## Overview
 
