@@ -26,12 +26,15 @@ jobs:
         cache: 'npm'
     - name: Install dependencies
       run: |
-        # Clean install with fallback for platform-specific optional dependencies
-        npm ci || (
-          echo "Initial npm ci failed, trying with clean install..."
-          rm -rf node_modules package-lock.json
-          npm install
-        )
+        # Fix for Rollup platform-specific dependencies issue
+        npm config set foreground-scripts true
+        npm config set ignore-scripts false
+
+        # Install with --no-optional to avoid platform-specific binaries
+        npm ci --no-optional
+
+        # Install Vitest explicitly to ensure it's properly installed
+        npm install -D vitest
 
     - name: Add format:check script if needed
       run: |
@@ -127,7 +130,7 @@ jobs:
         }' > firebaseServiceKey.json
 
     - name: Cache Firebase Emulators
-      uses: actions/cache@v4
+      uses: actions/cache@v3
       with:
         path: ~/.cache/firebase/emulators
         key: ${{ runner.os }}-firebase-emulators-${{ hashFiles('firebase.json') }}
@@ -206,7 +209,7 @@ jobs:
         npm run build --if-present
 
         # Run all tests with coverage in emulator mode
-        npm run test:coverage:emulator
+        NODE_OPTIONS="--max-old-space-size=4096" npm run test:coverage:emulator
 
         # Store the test result
         TEST_RESULT=$?
@@ -261,7 +264,7 @@ jobs:
 
     - name: Upload Coverage Report
       if: always() && steps.run_tests.outcome == 'success'
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v3
       with:
         name: coverage-report
         path: |
