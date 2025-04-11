@@ -16,7 +16,7 @@ The [Model Context Protocol (MCP)](https://github.com/modelcontextprotocol) is a
 - **Firestore**: Document database operations
 - **Storage**: File storage and retrieval
 
-The server exposes Firebase services through MCP tools, making them accessible to LLM clients including [Claude Desktop](https://claude.ai/download), [Cursor](https://www.cursor.com/), [Roo Code](https://github.com/RooVetGit/Roo-Code), and [Cline](https://cline.bot/), while handling authentication and connection management.
+The server exposes Firebase services through MCP tools, making them accessible to LLM clients including [Claude Desktop](https://claude.ai/download), [Augment](https://docs.augmentcode.com/setup-augment/mcp#about-model-context-protocol-servers), [VS Code](https://code.visualstudio.com/docs/copilot/chat/mcp-servers), [Cursor](https://www.cursor.com/), and others, while handling authentication and connection management.
 
 ## 🔥 New in v1.3.3: Storage Upload Features
 
