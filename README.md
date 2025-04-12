@@ -1,4 +1,4 @@
-# Firebase MCP Server
+# Firebase MCP
 
 ![Project Logo](./assets/logo.png)
 
@@ -10,13 +10,13 @@
 
 ## Overview
 
-The **Firebase MCP Server** bridges the gap between AI assistants and Firebase services through the open [Model Context Protocol (MCP)](https://github.com/modelcontextprotocol). This server enables any MCP-compatible LLM client to interact with Firebase's powerful backend services:
+**Firebase MCP** enables AI assistants to work directly with Firebase services, including:
 
 - **Firestore**: Document database operations
 - **Storage**: File management with robust upload capabilities
 - **Authentication**: User management and verification
 
-By exposing Firebase through standardized MCP tools, this server makes Firebase services accessible to AI clients including [Claude Desktop](https://claude.ai/download), [Augment](https://docs.augmentcode.com/setup-augment/mcp#about-model-context-protocol-servers), [VS Code](https://code.visualstudio.com/docs/copilot/chat/mcp-servers), [Cursor](https://www.cursor.com/), and more.
+The server works with MCP client applicatios such as [Claude Desktop](https://claude.ai/download), [Augment Code](https://docs.augmentcode.com/setup-augment/mcp), [VS Code](https://code.visualstudio.com/docs/copilot/chat/mcp-servers), and [Cursor](https://www.cursor.com/).
 
 ## ⚡ Quick Start
 
