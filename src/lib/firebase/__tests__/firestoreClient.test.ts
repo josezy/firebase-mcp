@@ -989,5 +989,30 @@ describe('Firestore Client', () => {
         vi.restoreAllMocks();
       }
     });
+
+    // Test for error handling in queryCollectionGroup when collection group query fails (lines 437-439)
+    it('should handle collection group query errors', async () => {
+      // Mock admin.firestore().collectionGroup().get to throw an error
+      const mockGet = vi.fn().mockRejectedValue(new Error('Collection group query failed'));
+      const mockCollectionGroup = vi.fn().mockReturnValue({
+        where: vi.fn().mockReturnThis(),
+        orderBy: vi.fn().mockReturnThis(),
+        limit: vi.fn().mockReturnThis(),
+        startAfter: vi.fn().mockReturnThis(),
+        get: mockGet,
+      });
+
+      vi.spyOn(admin.firestore(), 'collectionGroup').mockImplementation(mockCollectionGroup);
+
+      // Call the function
+      const result = await queryCollectionGroup('testCollection');
+
+      // Verify error response
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain('Collection group query failed');
+
+      // Restore the original implementation
+      vi.restoreAllMocks();
+    });
   });
 });
