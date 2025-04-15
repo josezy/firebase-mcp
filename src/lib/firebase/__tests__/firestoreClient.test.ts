@@ -251,6 +251,27 @@ describe('Firestore Client', () => {
         process.env.SERVICE_ACCOUNT_KEY_PATH = originalPath;
       }
     });
+
+    // Test for error handling in addDocument (lines 233-238)
+    it('should handle Firestore errors in addDocument', async () => {
+      // Mock admin.firestore().collection().add() to throw an error
+      const mockAdd = vi.fn().mockRejectedValue(new Error('Firestore add error'));
+      const mockCollection = vi.fn().mockReturnValue({
+        add: mockAdd,
+      });
+
+      vi.spyOn(admin.firestore(), 'collection').mockImplementation(mockCollection);
+
+      // Call the function
+      const result = await addDocument('testCollection', { test: true });
+
+      // Verify error response
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain('Firestore add error');
+
+      // Restore the original implementation
+      vi.restoreAllMocks();
+    });
   });
 
   describe('updateDocument', () => {
@@ -591,6 +612,36 @@ describe('Firestore Client', () => {
       expect(result.isError).toBe(true);
       expect(result.content).toBeDefined();
       expect(result.content[0].type).toBe('error');
+    });
+
+    // Test for error handling in listDocuments when Firestore query fails (lines 77-82)
+    it('should handle Firestore query errors in listDocuments', async () => {
+      // Mock admin.firestore().collection().get to throw an error
+      const mockGet = vi.fn().mockRejectedValue(new Error('Firestore query error'));
+      const mockWhere = vi.fn().mockReturnThis();
+      const mockOrderBy = vi.fn().mockReturnThis();
+      const mockLimit = vi.fn().mockReturnThis();
+      const mockStartAfter = vi.fn().mockReturnThis();
+
+      const mockCollection = vi.fn().mockReturnValue({
+        where: mockWhere,
+        orderBy: mockOrderBy,
+        limit: mockLimit,
+        startAfter: mockStartAfter,
+        get: mockGet,
+      });
+
+      vi.spyOn(admin.firestore(), 'collection').mockImplementation(mockCollection);
+
+      // Call the function
+      const result = await listDocuments('testCollection');
+
+      // Verify error response
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain('Firestore query error');
+
+      // Restore the original implementation
+      vi.restoreAllMocks();
     });
   });
 
@@ -1034,6 +1085,33 @@ describe('Firestore Client', () => {
       // Verify error response
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toContain('Collection group query failed');
+
+      // Restore the original implementation
+      vi.restoreAllMocks();
+    });
+
+    // Test for error handling in queryCollectionGroup with orderBy (lines 428-431)
+    it('should handle orderBy in queryCollectionGroup', async () => {
+      // Mock admin.firestore().collectionGroup().orderBy().get to throw an error
+      const mockGet = vi.fn().mockRejectedValue(new Error('OrderBy error'));
+      const mockOrderBy = vi.fn().mockReturnValue({
+        limit: vi.fn().mockReturnThis(),
+        get: mockGet,
+      });
+      const mockCollectionGroup = vi.fn().mockReturnValue({
+        where: vi.fn().mockReturnThis(),
+        orderBy: mockOrderBy,
+      });
+
+      vi.spyOn(admin.firestore(), 'collectionGroup').mockImplementation(mockCollectionGroup);
+
+      // Call the function with orderBy
+      const orderByParams = [{ field: 'timestamp', direction: 'desc' }];
+      const result = await queryCollectionGroup('testCollection', undefined, orderByParams);
+
+      // Verify error response
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain('OrderBy error');
 
       // Restore the original implementation
       vi.restoreAllMocks();
