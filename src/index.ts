@@ -20,6 +20,7 @@ import {
 } from '@modelcontextprotocol/sdk/types.js';
 import * as admin from 'firebase-admin';
 import { logger } from './utils/logger.js';
+import { Timestamp } from 'firebase-admin/firestore';
 
 // Initialize Firebase
 function initializeFirebase() {
@@ -474,7 +475,37 @@ class FirebaseMcpServer {
           case 'firestore_add_document': {
             const collection = args.collection as string;
             const data = args.data as Record<string, any>;
-            const docRef = await admin.firestore().collection(collection).add(data);
+
+            // Process server timestamps and convert ISO date strings to Timestamps
+            const processedData = Object.entries(data).reduce(
+              (acc, [key, value]) => {
+                // Check if this is a server timestamp request
+                if (value && typeof value === 'object' && '__serverTimestamp' in value) {
+                  acc[key] = admin.firestore.FieldValue.serverTimestamp();
+                }
+                // Check if this is an ISO date string that should be converted to a Timestamp
+                else if (
+                  typeof value === 'string' &&
+                  /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(value)
+                ) {
+                  try {
+                    // Convert ISO string to Timestamp for Firestore
+                    acc[key] = admin.firestore.Timestamp.fromDate(new Date(value));
+                    logger.debug(`Converted string date to Timestamp: ${value}`);
+                  } catch (e) {
+                    // If conversion fails, use the original value
+                    logger.warn(`Failed to convert date string to Timestamp: ${value}`);
+                    acc[key] = value;
+                  }
+                } else {
+                  acc[key] = value;
+                }
+                return acc;
+              },
+              {} as Record<string, any>
+            );
+
+            const docRef = await admin.firestore().collection(collection).add(processedData);
 
             return {
               content: [
@@ -506,7 +537,23 @@ class FirebaseMcpServer {
 
             if (filters && filters.length > 0) {
               filters.forEach(filter => {
-                query = query.where(filter.field, filter.operator, filter.value);
+                let filterValue = filter.value;
+
+                // Check if this might be a timestamp value in ISO format
+                if (
+                  typeof filterValue === 'string' &&
+                  /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(filterValue)
+                ) {
+                  try {
+                    // Convert ISO string to Timestamp for Firestore queries
+                    filterValue = admin.firestore.Timestamp.fromDate(new Date(filterValue));
+                  } catch (e) {
+                    // If conversion fails, use the original value
+                    logger.warn(`Failed to convert timestamp string to Timestamp: ${filterValue}`);
+                  }
+                }
+
+                query = query.where(filter.field, filter.operator, filterValue);
               });
             }
 
@@ -554,6 +601,10 @@ class FirebaseMcpServer {
                   // Convert Date objects to ISO strings
                   else if (value instanceof Date) {
                     acc[key] = value.toISOString();
+                  }
+                  // Handle Firestore Timestamp objects properly
+                  else if (value instanceof Timestamp) {
+                    acc[key] = value.toDate().toISOString();
                   }
                   // Convert arrays to strings
                   else if (Array.isArray(value)) {
@@ -629,6 +680,8 @@ class FirebaseMcpServer {
                   acc[key] = value;
                 } else if (value instanceof Date) {
                   acc[key] = value.toISOString();
+                } else if (value instanceof Timestamp) {
+                  acc[key] = value.toDate().toISOString();
                 } else if (Array.isArray(value)) {
                   acc[key] = `[${value.join(', ')}]`;
                 } else if (typeof value === 'object') {
@@ -660,8 +713,37 @@ class FirebaseMcpServer {
             const id = args.id as string;
             const data = args.data as Record<string, any>;
 
+            // Process server timestamps and convert ISO date strings to Timestamps
+            const processedData = Object.entries(data).reduce(
+              (acc, [key, value]) => {
+                // Check if this is a server timestamp request
+                if (value && typeof value === 'object' && '__serverTimestamp' in value) {
+                  acc[key] = admin.firestore.FieldValue.serverTimestamp();
+                }
+                // Check if this is an ISO date string that should be converted to a Timestamp
+                else if (
+                  typeof value === 'string' &&
+                  /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(value)
+                ) {
+                  try {
+                    // Convert ISO string to Timestamp for Firestore
+                    acc[key] = admin.firestore.Timestamp.fromDate(new Date(value));
+                    logger.debug(`Converted string date to Timestamp: ${value}`);
+                  } catch (e) {
+                    // If conversion fails, use the original value
+                    logger.warn(`Failed to convert date string to Timestamp: ${value}`);
+                    acc[key] = value;
+                  }
+                } else {
+                  acc[key] = value;
+                }
+                return acc;
+              },
+              {} as Record<string, any>
+            );
+
             const docRef = admin.firestore().collection(collection).doc(id);
-            await docRef.update(data);
+            await docRef.update(processedData);
 
             return {
               content: [
@@ -1034,7 +1116,25 @@ class FirebaseMcpServer {
 
               if (filters && filters.length > 0) {
                 filters.forEach(filter => {
-                  query = query.where(filter.field, filter.operator, filter.value);
+                  let filterValue = filter.value;
+
+                  // Check if this might be a timestamp value in ISO format
+                  if (
+                    typeof filterValue === 'string' &&
+                    /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(filterValue)
+                  ) {
+                    try {
+                      // Convert ISO string to Timestamp for Firestore queries
+                      filterValue = admin.firestore.Timestamp.fromDate(new Date(filterValue));
+                    } catch (e) {
+                      // If conversion fails, use the original value
+                      logger.warn(
+                        `Failed to convert timestamp string to Timestamp: ${filterValue}`
+                      );
+                    }
+                  }
+
+                  query = query.where(filter.field, filter.operator, filterValue);
                 });
               }
 
@@ -1084,6 +1184,10 @@ class FirebaseMcpServer {
                       // Convert Date objects to ISO strings
                       else if (value instanceof Date) {
                         acc[key] = value.toISOString();
+                      }
+                      // Handle Firestore Timestamp objects properly
+                      else if (value instanceof Timestamp) {
+                        acc[key] = value.toDate().toISOString();
                       }
                       // Convert arrays to strings
                       else if (Array.isArray(value)) {
