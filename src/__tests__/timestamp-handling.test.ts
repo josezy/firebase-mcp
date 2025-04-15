@@ -83,7 +83,7 @@ const createCollectionMock = (collectionName: string) => {
       mockDocsStorage[collectionName].push({
         id,
         ref: { path: `${collectionName}/${id}`, id },
-        data: processedData
+        data: processedData,
       });
 
       const docRef = createDocRefMock(collectionName, id, processedData);
@@ -99,15 +99,15 @@ const createCollectionMock = (collectionName: string) => {
     startAfter: vi.fn().mockReturnThis(),
     get: vi.fn().mockImplementation(() => {
       let docs = [...mockDocsStorage[collectionName]];
-      
+
       console.log(`[TEST DEBUG] Starting with ${docs.length} documents in ${collectionName}`);
-      
+
       // Apply all filters
       for (const filter of filterState.filters) {
         const { field, operator, value } = filter;
-        
+
         console.log(`[TEST DEBUG] Applying filter: ${field} ${operator}`, value);
-        
+
         // Convert value to Timestamp if it's an ISO date string
         let compareValue = value;
         if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(value)) {
@@ -131,7 +131,7 @@ const createCollectionMock = (collectionName: string) => {
 
         docs = docs.filter(doc => {
           const docData = doc.data;
-          
+
           if (!docData || !(field in docData)) {
             console.log(`[TEST DEBUG] Document ${doc.id} doesn't have field ${field}`);
             return false;
@@ -181,14 +181,14 @@ const createCollectionMock = (collectionName: string) => {
             default:
               result = false;
           }
-          
+
           console.log(`[TEST DEBUG] Comparison ${operator} result for doc ${doc.id}: ${result}`);
           return result;
         });
       }
 
       console.log(`[TEST DEBUG] Filtered to ${docs.length} documents`);
-      
+
       // Create snapshot result with docs array
       return Promise.resolve({
         docs: docs.map(doc => ({
@@ -382,7 +382,7 @@ describe('Timestamp Handling', () => {
     // Reset modules and mocks
     vi.resetModules();
     vi.clearAllMocks();
-    
+
     // Reset mock storage
     mockDocsStorage = {};
 
@@ -514,7 +514,7 @@ describe('Timestamp Handling', () => {
         collection: 'test',
         id: docResult.id,
       });
-      
+
       console.log('[TEST DEBUG] Created document with timestamp:', doc.data?.timestamp);
 
       // Filter using exact timestamp
@@ -533,39 +533,39 @@ describe('Timestamp Handling', () => {
     it('should handle timestamp comparison operators in Firestore queries', async () => {
       // Instead of testing the actual filtering via the mock, we'll test that the
       // timestamp conversion happens correctly when passing filters to Firestore
-      
+
       // Create three timestamps - past, present and future
       const pastDate = '2021-01-01T00:00:00.000Z';
       const middleDate = '2023-01-01T00:00:00.000Z';
       const futureDate = '2025-01-01T00:00:00.000Z';
-      
+
       // We'll test the handler's conversion from ISO strings to Timestamp objects
       // by checking that it correctly processes timestamps in filter conditions
-      
+
       // Create a mock for the Firestore collection's where method to verify it gets called
       // with the correct converted values
       const whereMock = vi.fn().mockReturnThis();
       const getMock = vi.fn().mockResolvedValue({ docs: [] });
-      
+
       // Replace the collection mock with one that can track filter parameters
       const originalFirestore = adminMock.firestore;
       adminMock.firestore = () => ({
         ...originalFirestore(),
         collection: vi.fn().mockReturnValue({
           where: whereMock,
-          get: getMock
+          get: getMock,
         }),
         Timestamp: {
-          fromDate: (date: Date) => new MockTimestamp(Math.floor(date.getTime() / 1000))
-        }
+          fromDate: (date: Date) => new MockTimestamp(Math.floor(date.getTime() / 1000)),
+        },
       });
-      
+
       // Test the '>' operator
       await handleFirestoreRequest('firestore_list_documents', {
         collection: 'test',
-        filters: [{ field: 'timestamp', operator: '>', value: middleDate }]
+        filters: [{ field: 'timestamp', operator: '>', value: middleDate }],
       });
-      
+
       // Check that the ISO string date was converted to a Timestamp object
       expect(whereMock).toHaveBeenCalled();
       const [field, operator, value] = whereMock.mock.calls[0];
@@ -573,48 +573,48 @@ describe('Timestamp Handling', () => {
       expect(operator).toBe('>');
       expect(value).toBeInstanceOf(MockTimestamp);
       expect(value._seconds).toBeGreaterThan(0); // Just check it's a valid timestamp
-      
+
       // Reset the mock for the next test
       whereMock.mockClear();
-      
+
       // Test the '<' operator
       await handleFirestoreRequest('firestore_list_documents', {
         collection: 'test',
-        filters: [{ field: 'timestamp', operator: '<', value: middleDate }]
+        filters: [{ field: 'timestamp', operator: '<', value: middleDate }],
       });
-      
+
       // Check it was called with the correct operator and converted timestamp
       expect(whereMock).toHaveBeenCalled();
       const [field2, operator2, value2] = whereMock.mock.calls[0];
       expect(field2).toBe('timestamp');
       expect(operator2).toBe('<');
       expect(value2).toBeInstanceOf(MockTimestamp);
-      
+
       // Reset the mock for the next test
       whereMock.mockClear();
-      
+
       // Test a range query with multiple conditions
       await handleFirestoreRequest('firestore_list_documents', {
         collection: 'test',
         filters: [
           { field: 'timestamp', operator: '>=', value: pastDate },
-          { field: 'timestamp', operator: '<=', value: middleDate }
-        ]
+          { field: 'timestamp', operator: '<=', value: middleDate },
+        ],
       });
-      
+
       // Verify both conditions were properly processed
       expect(whereMock).toHaveBeenCalledTimes(2);
-      
+
       const [field3, operator3, value3] = whereMock.mock.calls[0];
       expect(field3).toBe('timestamp');
       expect(operator3).toBe('>=');
       expect(value3).toBeInstanceOf(MockTimestamp);
-      
+
       const [field4, operator4, value4] = whereMock.mock.calls[1];
       expect(field4).toBe('timestamp');
       expect(operator4).toBe('<=');
       expect(value4).toBeInstanceOf(MockTimestamp);
-      
+
       // Restore the original firestore function
       adminMock.firestore = originalFirestore;
     });
