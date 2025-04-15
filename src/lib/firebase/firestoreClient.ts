@@ -90,7 +90,6 @@ export async function list_collections(
  * @returns The same data object with Timestamps converted to ISO strings
  * @private
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function convertTimestampsToISO(data: any) {
   for (const key in data) {
     if (data[key] instanceof Timestamp) {
