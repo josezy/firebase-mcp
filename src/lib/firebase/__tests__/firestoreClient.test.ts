@@ -142,6 +142,30 @@ describe('Firestore Client', () => {
         process.env.SERVICE_ACCOUNT_KEY_PATH = originalPath;
       }
     });
+
+    // Test for error handling in getDocument (lines 287-292)
+    it('should handle Firestore errors in getDocument', async () => {
+      // Mock admin.firestore().collection().doc().get() to throw an error
+      const mockGet = vi.fn().mockRejectedValue(new Error('Firestore error'));
+      const mockDoc = vi.fn().mockReturnValue({
+        get: mockGet,
+      });
+      const mockCollection = vi.fn().mockReturnValue({
+        doc: mockDoc,
+      });
+
+      vi.spyOn(admin.firestore(), 'collection').mockImplementation(mockCollection);
+
+      // Call the function
+      const result = await getDocument('testCollection', 'nonexistent-id');
+
+      // Verify error response
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain('Firestore error');
+
+      // Restore the original implementation
+      vi.restoreAllMocks();
+    });
   });
 
   describe('addDocument', () => {
