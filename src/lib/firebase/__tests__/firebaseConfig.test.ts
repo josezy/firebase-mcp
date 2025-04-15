@@ -112,5 +112,24 @@ describe('Firebase Config', () => {
       result = initializeFirebase();
       expect(result).toBeNull();
     });
+
+    it('should handle JSON parse errors in initializeFirebase', () => {
+      // Mock admin.app to throw (no existing app)
+      vi.mocked(admin.app).mockImplementation(() => {
+        throw new Error('No app exists');
+      });
+
+      // Set SERVICE_ACCOUNT_KEY_PATH
+      process.env.SERVICE_ACCOUNT_KEY_PATH = '/path/to/service-account.json';
+
+      // Mock fs.readFileSync to return invalid JSON
+      vi.mocked(fs.readFileSync).mockReturnValueOnce('{ invalid json }');
+
+      // Call the function
+      const result = initializeFirebase();
+
+      // Verify the result
+      expect(result).toBeNull();
+    });
   });
 });

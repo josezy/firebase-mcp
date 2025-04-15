@@ -917,5 +917,77 @@ describe('Firestore Client', () => {
         throw error;
       }
     });
+
+    // Test for invalid pageToken handling (lines 435-451)
+    it('should handle invalid pageToken in queryCollectionGroup', async () => {
+      // Mock admin.firestore().doc to throw an error
+      const mockDoc = vi.fn().mockImplementation(() => {
+        throw new Error('Invalid document path');
+      });
+
+      vi.spyOn(admin.firestore(), 'doc').mockImplementation(mockDoc);
+
+      // Call the function with an invalid pageToken
+      const result = await queryCollectionGroup(
+        'testCollection',
+        undefined,
+        undefined,
+        10,
+        'invalid/token'
+      );
+
+      // Verify error response
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain('Invalid pagination token');
+
+      // Restore the original implementation
+      vi.restoreAllMocks();
+    });
+
+    // Test for missing service account path (lines 459-463)
+    it('should handle missing service account path in queryCollectionGroup', async () => {
+      // Save the original service account path
+      const originalPath = process.env.SERVICE_ACCOUNT_KEY_PATH;
+
+      try {
+        // Clear the service account path
+        delete process.env.SERVICE_ACCOUNT_KEY_PATH;
+
+        // Call the function
+        const result = await queryCollectionGroup('testCollection');
+
+        // Verify error response
+        expect(result.isError).toBe(true);
+        expect(result.content[0].text).toBe('Service account path not set');
+      } finally {
+        // Restore the original service account path
+        process.env.SERVICE_ACCOUNT_KEY_PATH = originalPath;
+      }
+    });
+
+    // Test for null project ID (lines 467-471)
+    it('should handle null project ID in queryCollectionGroup', async () => {
+      // Save the original service account path
+      const originalPath = process.env.SERVICE_ACCOUNT_KEY_PATH;
+
+      try {
+        // Mock getProjectId to return null
+        vi.spyOn(firebaseConfig, 'getProjectId').mockReturnValue(null);
+
+        // Set service account path to ensure code path is executed
+        process.env.SERVICE_ACCOUNT_KEY_PATH = '/path/to/service-account.json';
+
+        // Call the function
+        const result = await queryCollectionGroup('testCollection');
+
+        // Verify error response
+        expect(result.isError).toBe(true);
+        expect(result.content[0].text).toBe('Could not determine project ID');
+      } finally {
+        // Restore service account path
+        process.env.SERVICE_ACCOUNT_KEY_PATH = originalPath;
+        vi.restoreAllMocks();
+      }
+    });
   });
 });

@@ -13,10 +13,6 @@ dist/
 
 # Dependency directories
 node_modules/
-jspm_packages/
-
-# Snowpack dependency directory (https://snowpack.dev/)
-web_modules/
 
 # TypeScript cache
 *.tsbuildinfo
@@ -41,8 +37,6 @@ web_modules/
 .cache
 .parcel-cache
 
-# Next.js build output
-
 # Stores VSCode versions used for testing VSCode extensions
 .vscode-test
 
@@ -55,14 +49,17 @@ web_modules/
 .DS_Store
 
 # project specific files
-
 .specstory/
 .cursor/
 .scripts/
-coverage/
 .github/copilot-instructions.md
 firebase-mcp.code-workspace
 .cursorignore
+.augment-guidelines
+
+# test files
+temp-test-file-*.txt
+coverage/
 test-output/
 
 # firebase files
