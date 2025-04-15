@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.4] - 2025-04-15
+
+### Fixed
+
+- Fixed Firestore timestamp handling issues:
+  - Fixed inconsistency where timestamp objects were displayed as "[Object]" in responses
+  - Added proper conversion of Firestore Timestamp objects to ISO strings
+  - Enhanced timestamp filtering to work correctly with both server timestamps and ISO string dates
+  - Implemented automatic conversion of ISO string dates to Firestore Timestamp objects when creating/updating documents
+  - Improved query filtering to properly handle timestamp comparisons
+
 ## [1.3.3] - 2025-04-11
 
 ### Added

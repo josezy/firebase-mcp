@@ -142,6 +142,30 @@ describe('Firestore Client', () => {
         process.env.SERVICE_ACCOUNT_KEY_PATH = originalPath;
       }
     });
+
+    // Test for error handling in getDocument (lines 287-292)
+    it('should handle Firestore errors in getDocument', async () => {
+      // Mock admin.firestore().collection().doc().get() to throw an error
+      const mockGet = vi.fn().mockRejectedValue(new Error('Firestore error'));
+      const mockDoc = vi.fn().mockReturnValue({
+        get: mockGet,
+      });
+      const mockCollection = vi.fn().mockReturnValue({
+        doc: mockDoc,
+      });
+
+      vi.spyOn(admin.firestore(), 'collection').mockImplementation(mockCollection);
+
+      // Call the function
+      const result = await getDocument('testCollection', 'nonexistent-id');
+
+      // Verify error response
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain('Firestore error');
+
+      // Restore the original implementation
+      vi.restoreAllMocks();
+    });
   });
 
   describe('addDocument', () => {
@@ -226,6 +250,27 @@ describe('Firestore Client', () => {
         // Restore service account path
         process.env.SERVICE_ACCOUNT_KEY_PATH = originalPath;
       }
+    });
+
+    // Test for error handling in addDocument (lines 233-238)
+    it('should handle Firestore errors in addDocument', async () => {
+      // Mock admin.firestore().collection().add() to throw an error
+      const mockAdd = vi.fn().mockRejectedValue(new Error('Firestore add error'));
+      const mockCollection = vi.fn().mockReturnValue({
+        add: mockAdd,
+      });
+
+      vi.spyOn(admin.firestore(), 'collection').mockImplementation(mockCollection);
+
+      // Call the function
+      const result = await addDocument('testCollection', { test: true });
+
+      // Verify error response
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain('Firestore add error');
+
+      // Restore the original implementation
+      vi.restoreAllMocks();
     });
   });
 
@@ -567,6 +612,56 @@ describe('Firestore Client', () => {
       expect(result.isError).toBe(true);
       expect(result.content).toBeDefined();
       expect(result.content[0].type).toBe('error');
+    });
+
+    // Test for error handling in listDocuments when Firestore query fails (lines 77-82)
+    it('should handle Firestore query errors in listDocuments', async () => {
+      // Mock admin.firestore().collection().get to throw an error
+      const mockGet = vi.fn().mockRejectedValue(new Error('Firestore query error'));
+      const mockWhere = vi.fn().mockReturnThis();
+      const mockOrderBy = vi.fn().mockReturnThis();
+      const mockLimit = vi.fn().mockReturnThis();
+      const mockStartAfter = vi.fn().mockReturnThis();
+
+      const mockCollection = vi.fn().mockReturnValue({
+        where: mockWhere,
+        orderBy: mockOrderBy,
+        limit: mockLimit,
+        startAfter: mockStartAfter,
+        get: mockGet,
+      });
+
+      vi.spyOn(admin.firestore(), 'collection').mockImplementation(mockCollection);
+
+      // Call the function
+      const result = await listDocuments('testCollection');
+
+      // Verify error response
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain('Firestore query error');
+
+      // Restore the original implementation
+      vi.restoreAllMocks();
+    });
+
+    // Test for error handling in listDocuments when doc() throws an error (lines 144-149)
+    it('should handle doc() errors in listDocuments with pageToken', async () => {
+      // Mock admin.firestore().doc() to throw an error
+      const mockDoc = vi.fn().mockImplementation(() => {
+        throw new Error('Invalid document reference');
+      });
+
+      vi.spyOn(admin.firestore(), 'doc').mockImplementation(mockDoc);
+
+      // Call the function with an invalid pageToken
+      const result = await listDocuments('testCollection', undefined, 5, 'invalid/doc/path');
+
+      // Verify error response
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain('Invalid document reference');
+
+      // Restore the original implementation
+      vi.restoreAllMocks();
     });
   });
 
@@ -916,6 +1011,247 @@ describe('Firestore Client', () => {
         console.log('DEBUG_TEST: Caught error in test:', error);
         throw error;
       }
+    });
+
+    // Test for invalid pageToken handling (lines 435-451)
+    it('should handle invalid pageToken in queryCollectionGroup', async () => {
+      // Mock admin.firestore().doc to throw an error
+      const mockDoc = vi.fn().mockImplementation(() => {
+        throw new Error('Invalid document path');
+      });
+
+      vi.spyOn(admin.firestore(), 'doc').mockImplementation(mockDoc);
+
+      // Call the function with an invalid pageToken
+      const result = await queryCollectionGroup(
+        'testCollection',
+        undefined,
+        undefined,
+        10,
+        'invalid/token'
+      );
+
+      // Verify error response
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain('Invalid pagination token');
+
+      // Restore the original implementation
+      vi.restoreAllMocks();
+    });
+
+    // Test for missing service account path (lines 459-463)
+    it('should handle missing service account path in queryCollectionGroup', async () => {
+      // Save the original service account path
+      const originalPath = process.env.SERVICE_ACCOUNT_KEY_PATH;
+
+      try {
+        // Clear the service account path
+        delete process.env.SERVICE_ACCOUNT_KEY_PATH;
+
+        // Call the function
+        const result = await queryCollectionGroup('testCollection');
+
+        // Verify error response
+        expect(result.isError).toBe(true);
+        expect(result.content[0].text).toBe('Service account path not set');
+      } finally {
+        // Restore the original service account path
+        process.env.SERVICE_ACCOUNT_KEY_PATH = originalPath;
+      }
+    });
+
+    // Test for null project ID (lines 467-471)
+    it('should handle null project ID in queryCollectionGroup', async () => {
+      // Save the original service account path
+      const originalPath = process.env.SERVICE_ACCOUNT_KEY_PATH;
+
+      try {
+        // Mock getProjectId to return null
+        vi.spyOn(firebaseConfig, 'getProjectId').mockReturnValue(null);
+
+        // Set service account path to ensure code path is executed
+        process.env.SERVICE_ACCOUNT_KEY_PATH = '/path/to/service-account.json';
+
+        // Call the function
+        const result = await queryCollectionGroup('testCollection');
+
+        // Verify error response
+        expect(result.isError).toBe(true);
+        expect(result.content[0].text).toBe('Could not determine project ID');
+      } finally {
+        // Restore service account path
+        process.env.SERVICE_ACCOUNT_KEY_PATH = originalPath;
+        vi.restoreAllMocks();
+      }
+    });
+
+    // Test for error handling in queryCollectionGroup when collection group query fails (lines 437-439)
+    it('should handle collection group query errors', async () => {
+      // Mock admin.firestore().collectionGroup().get to throw an error
+      const mockGet = vi.fn().mockRejectedValue(new Error('Collection group query failed'));
+      const mockCollectionGroup = vi.fn().mockReturnValue({
+        where: vi.fn().mockReturnThis(),
+        orderBy: vi.fn().mockReturnThis(),
+        limit: vi.fn().mockReturnThis(),
+        startAfter: vi.fn().mockReturnThis(),
+        get: mockGet,
+      });
+
+      vi.spyOn(admin.firestore(), 'collectionGroup').mockImplementation(mockCollectionGroup);
+
+      // Call the function
+      const result = await queryCollectionGroup('testCollection');
+
+      // Verify error response
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain('Collection group query failed');
+
+      // Restore the original implementation
+      vi.restoreAllMocks();
+    });
+
+    // Test for error handling in queryCollectionGroup with orderBy (lines 428-431)
+    it('should handle orderBy in queryCollectionGroup', async () => {
+      // Mock admin.firestore().collectionGroup().orderBy().get to throw an error
+      const mockGet = vi.fn().mockRejectedValue(new Error('OrderBy error'));
+      const mockOrderBy = vi.fn().mockReturnValue({
+        limit: vi.fn().mockReturnThis(),
+        get: mockGet,
+      });
+      const mockCollectionGroup = vi.fn().mockReturnValue({
+        where: vi.fn().mockReturnThis(),
+        orderBy: mockOrderBy,
+      });
+
+      vi.spyOn(admin.firestore(), 'collectionGroup').mockImplementation(mockCollectionGroup);
+
+      // Call the function with orderBy
+      const orderByParams = [{ field: 'timestamp', direction: 'desc' }];
+      const result = await queryCollectionGroup('testCollection', undefined, orderByParams);
+
+      // Verify error response
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain('OrderBy error');
+
+      // Restore the original implementation
+      vi.restoreAllMocks();
+    });
+
+    // Test for error handling in queryCollectionGroup when query fails (lines 437-439)
+    it('should handle query execution errors in queryCollectionGroup', async () => {
+      // Mock admin.firestore().collectionGroup().where().get to throw an error
+      const mockGet = vi.fn().mockRejectedValue(new Error('Query execution error'));
+      const mockWhere = vi.fn().mockReturnValue({
+        orderBy: vi.fn().mockReturnThis(),
+        limit: vi.fn().mockReturnThis(),
+        get: mockGet,
+      });
+      const mockCollectionGroup = vi.fn().mockReturnValue({
+        where: mockWhere,
+      });
+
+      vi.spyOn(admin.firestore(), 'collectionGroup').mockImplementation(mockCollectionGroup);
+
+      // Call the function with filters
+      const filters = [{ field: 'test', operator: '==', value: 'value' }];
+      const result = await queryCollectionGroup('testCollection', filters);
+
+      // Verify error response
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain('Query execution error');
+
+      // Restore the original implementation
+      vi.restoreAllMocks();
+    });
+
+    // Test for error handling in queryCollectionGroup with invalid pageToken (lines 434-450)
+    it('should handle invalid pageToken in queryCollectionGroup', async () => {
+      // Mock admin.firestore().doc() to throw an error
+      const mockGet = vi.fn().mockResolvedValue({ exists: false });
+      const mockDoc = vi.fn().mockReturnValue({
+        get: mockGet,
+      });
+
+      vi.spyOn(admin.firestore(), 'doc').mockImplementation(mockDoc);
+
+      // Call the function with an invalid pageToken
+      const result = await queryCollectionGroup(
+        'testCollection',
+        undefined,
+        undefined,
+        20,
+        'invalid/doc/path'
+      );
+
+      // Verify the document doesn't exist and startAfter isn't called
+      expect(mockDoc).toHaveBeenCalledWith('invalid/doc/path');
+      expect(mockGet).toHaveBeenCalled();
+
+      // Restore the original implementation
+      vi.restoreAllMocks();
+    });
+
+    // Test for error handling in queryCollectionGroup when doc() throws an error (lines 435-449)
+    it('should handle doc() errors in queryCollectionGroup with pageToken', async () => {
+      // Mock admin.firestore().doc() to throw an error
+      const mockDoc = vi.fn().mockImplementation(() => {
+        throw new Error('Invalid document reference');
+      });
+
+      vi.spyOn(admin.firestore(), 'doc').mockImplementation(mockDoc);
+
+      // Call the function with an invalid pageToken
+      const result = await queryCollectionGroup(
+        'testCollection',
+        undefined,
+        undefined,
+        20,
+        'invalid/doc/path'
+      );
+
+      // Verify error response
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain('Invalid pagination token');
+      expect(result.content[0].text).toContain('Invalid document reference');
+
+      // Restore the original implementation
+      vi.restoreAllMocks();
+    });
+
+    // Test for startAfter in queryCollectionGroup with valid pageToken (lines 437-439)
+    it('should use startAfter with valid pageToken in queryCollectionGroup', async () => {
+      // Mock admin.firestore().doc().get() to return a valid document
+      const mockGet = vi.fn().mockResolvedValue({ exists: true });
+      const mockDoc = vi.fn().mockReturnValue({
+        get: mockGet,
+      });
+
+      // Mock the query chain
+      const mockStartAfter = vi.fn().mockReturnThis();
+      const mockLimit = vi.fn().mockReturnThis();
+      const mockGet2 = vi.fn().mockResolvedValue({
+        docs: [],
+      });
+
+      const mockCollectionGroup = vi.fn().mockReturnValue({
+        startAfter: mockStartAfter,
+        limit: mockLimit,
+        get: mockGet2,
+      });
+
+      vi.spyOn(admin.firestore(), 'doc').mockImplementation(mockDoc);
+      vi.spyOn(admin.firestore(), 'collectionGroup').mockImplementation(mockCollectionGroup);
+
+      // Call the function with a valid pageToken
+      await queryCollectionGroup('testCollection', undefined, undefined, 20, 'valid/doc/path');
+
+      // Verify startAfter was called with the document
+      expect(mockDoc).toHaveBeenCalledWith('valid/doc/path');
+      expect(mockGet).toHaveBeenCalled();
+      expect(mockStartAfter).toHaveBeenCalled();
+
+      // Restore the original implementation
+      vi.restoreAllMocks();
     });
   });
 });
