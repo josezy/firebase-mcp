@@ -11,11 +11,11 @@
 
 import * as admin from 'firebase-admin';
 import axios from 'axios';
-import { getProjectId } from './firebaseConfig';
+import { getProjectId } from './firebaseConfig.js';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
-import { logger } from '../../utils/logger';
+import { logger } from '../../utils/logger.js';
 
 /**
  * Detects content type from file path or data URL

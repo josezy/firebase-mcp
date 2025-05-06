@@ -11,21 +11,23 @@
  */
 
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
-import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
   ErrorCode,
   McpError,
 } from '@modelcontextprotocol/sdk/types.js';
-import * as admin from 'firebase-admin';
+import admin from 'firebase-admin';
 import { logger } from './utils/logger.js';
 import { Timestamp } from 'firebase-admin/firestore';
+import config from './config.js';
+import { initializeTransport } from './transports/index.js';
+import * as fs from 'fs';
 
 // Initialize Firebase
-function initializeFirebase() {
+async function initializeFirebase() {
   try {
-    const serviceAccountPath = process.env.SERVICE_ACCOUNT_KEY_PATH;
+    const serviceAccountPath = config.serviceAccountKeyPath;
     if (!serviceAccountPath) {
       logger.error('SERVICE_ACCOUNT_KEY_PATH not set');
       return null;
@@ -42,24 +44,43 @@ function initializeFirebase() {
       logger.debug('No existing Firebase app, initializing new one');
     }
 
-    // Using require for dynamic import based on environment variable
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const serviceAccount = require(serviceAccountPath);
-    const storageBucket = process.env.FIREBASE_STORAGE_BUCKET;
-    logger.debug(`Initializing Firebase with storage bucket: ${storageBucket}`);
+    // Read the service account key file
+    try {
+      const serviceAccountContent = fs.readFileSync(serviceAccountPath, 'utf8');
+      logger.debug(`Service account file read successfully: ${serviceAccountPath}`);
 
-    return admin.initializeApp({
-      credential: admin.credential.cert(serviceAccount),
-      storageBucket: storageBucket,
-    });
+      const serviceAccount = JSON.parse(serviceAccountContent);
+      logger.debug(
+        `Service account parsed successfully: ${Object.keys(serviceAccount).join(', ')}`
+      );
+
+      const storageBucket = config.storageBucket || undefined;
+      logger.debug(`Initializing Firebase with storage bucket: ${storageBucket}`);
+
+      // Initialize Firebase with the service account
+      return admin.initializeApp({
+        credential: admin.credential.cert(serviceAccount),
+        storageBucket: storageBucket,
+      });
+    } catch (error) {
+      logger.error(
+        `Error initializing Firebase: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
+      return null;
+    }
   } catch (error) {
     logger.error('Failed to initialize Firebase', error);
     return null;
   }
 }
 
-// Initialize Firebase
-const app = initializeFirebase();
+// Initialize Firebase (will be set asynchronously)
+let app: admin.app.App | null = null;
+
+// Initialize the app asynchronously
+(async () => {
+  app = await initializeFirebase();
+})();
 
 // Response interface used throughout the codebase
 interface McpResponse {
@@ -81,8 +102,8 @@ class FirebaseMcpServer {
   constructor() {
     this.server = new Server(
       {
-        name: 'firebase-mcp',
-        version: '1.3.3',
+        name: config.name,
+        version: config.version,
       },
       {
         capabilities: {
@@ -1313,12 +1334,27 @@ class FirebaseMcpServer {
   }
 
   /**
-   * Starts the MCP server using stdio transport.
-   * This method connects the server to stdin/stdout for communication with MCP clients.
+   * Starts the MCP server using the configured transport.
+   * This method initializes the appropriate transport based on configuration.
    */
   async run() {
-    const transport = new StdioServerTransport();
-    await this.server.connect(transport);
+    // Wait for Firebase to initialize
+    if (!app) {
+      logger.info('Waiting for Firebase to initialize...');
+      await new Promise<void>(resolve => {
+        const checkInterval = setInterval(() => {
+          if (app) {
+            clearInterval(checkInterval);
+            resolve();
+          }
+        }, 100);
+      });
+    }
+
+    logger.info(
+      `Starting Firebase MCP server v${config.version} with ${config.transport} transport`
+    );
+    await initializeTransport(this.server, config);
   }
 }
 

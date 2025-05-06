@@ -15,7 +15,7 @@
 
 import * as admin from 'firebase-admin';
 import fs from 'fs';
-import { logger } from '../../utils/logger';
+import { logger } from '../../utils/logger.js';
 
 /**
  * Initializes the Firebase Admin SDK with service account credentials.

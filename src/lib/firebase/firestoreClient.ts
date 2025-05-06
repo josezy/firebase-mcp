@@ -9,7 +9,7 @@
  */
 
 import { Timestamp } from 'firebase-admin/firestore';
-import { getProjectId } from './firebaseConfig';
+import { getProjectId } from './firebaseConfig.js';
 import * as admin from 'firebase-admin';
 
 interface FirestoreResponse {
