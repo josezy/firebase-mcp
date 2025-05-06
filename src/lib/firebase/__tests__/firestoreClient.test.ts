@@ -663,6 +663,54 @@ describe('Firestore Client', () => {
       // Restore the original implementation
       vi.restoreAllMocks();
     });
+
+    // Test for empty results in listDocuments (line 177)
+    it('should handle empty results in listDocuments', async () => {
+      // Mock admin.firestore().collection().get() to return empty results
+      const mockGet = vi.fn().mockResolvedValue({ docs: [] });
+      const mockWhere = vi.fn().mockReturnThis();
+      const mockLimit = vi.fn().mockReturnThis();
+      const mockStartAfter = vi.fn().mockReturnThis();
+
+      const mockCollection = vi.fn().mockReturnValue({
+        where: mockWhere,
+        limit: mockLimit,
+        startAfter: mockStartAfter,
+        get: mockGet,
+      });
+
+      vi.spyOn(admin.firestore(), 'collection').mockImplementation(mockCollection);
+
+      // Set service account path to ensure code path is executed
+      const originalPath = process.env.SERVICE_ACCOUNT_KEY_PATH;
+      process.env.SERVICE_ACCOUNT_KEY_PATH = '/path/to/service-account.json';
+
+      // Mock getProjectId to return a valid project ID
+      vi.spyOn(firebaseConfig, 'getProjectId').mockReturnValue('test-project');
+
+      try {
+        // Call the function
+        const result = await listDocuments('testCollection');
+
+        // Verify response
+        expect(result.isError).toBeUndefined();
+        expect(result.content[0].type).toBe('json');
+
+        // Parse the response
+        const responseData = JSON.parse(result.content[0].text);
+
+        // Verify documents array exists and is empty
+        expect(Array.isArray(responseData.documents)).toBe(true);
+        expect(responseData.documents.length).toBe(0);
+
+        // Verify nextPageToken is undefined
+        expect(responseData.nextPageToken).toBeUndefined();
+      } finally {
+        // Restore service account path
+        process.env.SERVICE_ACCOUNT_KEY_PATH = originalPath;
+        vi.restoreAllMocks();
+      }
+    });
   });
 
   describe('listCollections', () => {
@@ -790,6 +838,26 @@ describe('Firestore Client', () => {
           console.error('Cleanup error:', error);
         }
       }
+    });
+
+    // Test for error handling in list_collections (lines 77-82)
+    it('should handle Firestore errors in list_collections', async () => {
+      // Mock admin.firestore().listCollections() to throw an error
+      const mockListCollections = vi
+        .fn()
+        .mockRejectedValue(new Error('Firestore list collections error'));
+
+      vi.spyOn(admin.firestore(), 'listCollections').mockImplementation(mockListCollections);
+
+      // Call the function
+      const result = await list_collections();
+
+      // Verify error response
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain('Firestore list collections error');
+
+      // Restore the original implementation
+      vi.restoreAllMocks();
     });
   });
 

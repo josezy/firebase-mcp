@@ -251,6 +251,11 @@ jobs:
 
         # Kill the emulator process
         kill $EMULATOR_PID
+        
+    - name: Upload coverage reports to Codecov
+      uses: codecov/codecov-action@v5
+      with:
+        slug: gannonh/firebase-mcp  
 
   publish:
     name: Publish to npm
