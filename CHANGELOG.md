@@ -5,6 +5,31 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.5] - 2025-05-06
+
+### Added
+
+- Added Codecov integration for enhanced test coverage reporting and visualization
+
+### Fixed
+
+- Fixed TypeScript errors in `firestoreClient.test.ts` by using proper type assertions for filter operators and orderBy parameters
+
+### Changed
+
+- Updated dependencies to latest versions:
+  - axios: ^1.8.4 → ^1.9.0
+  - firebase-admin: ^13.2.0 → ^13.3.0
+  - @types/node: ^22.14.0 → ^22.15.14
+  - @typescript-eslint/eslint-plugin: ^8.29.1 → ^8.32.0
+  - @typescript-eslint/parser: ^8.29.1 → ^8.32.0
+  - @vitest/coverage-v8: ^3.1.1 → ^3.1.3
+  - eslint: ^9.24.0 → ^9.26.0
+  - eslint-config-prettier: ^9.1.0 → ^10.1.2
+  - eslint-plugin-prettier: ^5.2.6 → ^5.4.0
+  - typescript-eslint: ^8.30.2-alpha.5 → ^8.32.0
+  - vitest: ^3.1.1 → ^3.1.3
+
 ## [1.3.4] - 2025-04-15
 
 ### Fixed
