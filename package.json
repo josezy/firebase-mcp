@@ -22,7 +22,10 @@
     "test:coverage:emulator": "USE_FIREBASE_EMULATOR=true vitest run --coverage",
     "test:verbose": "clear && vitest run --reporter verbose",
     "start": "node dist/index.js",
+    "start:http": "MCP_TRANSPORT=http node dist/index.js",
     "dev": "tsc && node dist/index.js",
+    "dev:http": "tsc && MCP_TRANSPORT=http node dist/index.js",
+    "inspect": ".scripts/inspect-mcp.sh",
     "lint": "eslint 'src/**/*.ts'",
     "lint:fix": "eslint 'src/**/*.ts' --fix",
     "format": "prettier --write \"src/**/*.{ts,tsx}\"",
@@ -39,6 +42,8 @@
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.11.0",
     "axios": "^1.9.0",
+    "dotenv": "^16.5.0",
+    "express": "^5.1.0",
     "firebase-admin": "^13.3.0"
   },
   "devDependencies": {
