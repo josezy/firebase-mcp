@@ -983,10 +983,10 @@ describe('Firestore Client', () => {
       }
 
       const collectionGroup = 'testSubcollection';
-      const filters = [{ field: 'testField', operator: '==', value: 'testValue' }];
+      const filters = [{ field: 'testField', operator: '==' as const, value: 'testValue' }];
 
       try {
-        const result = await queryCollectionGroup(collectionGroup, filters as any);
+        const result = await queryCollectionGroup(collectionGroup, filters);
         console.log('DEBUG_TEST: Result object type:', typeof result);
 
         if (result && typeof result === 'object') {
@@ -1194,7 +1194,7 @@ describe('Firestore Client', () => {
       vi.spyOn(admin.firestore(), 'collectionGroup').mockImplementation(mockCollectionGroup);
 
       // Call the function with orderBy
-      const orderByParams = [{ field: 'timestamp', direction: 'desc' }];
+      const orderByParams = [{ field: 'timestamp', direction: 'desc' as const }];
       const result = await queryCollectionGroup('testCollection', undefined, orderByParams);
 
       // Verify error response
@@ -1221,7 +1221,7 @@ describe('Firestore Client', () => {
       vi.spyOn(admin.firestore(), 'collectionGroup').mockImplementation(mockCollectionGroup);
 
       // Call the function with filters
-      const filters = [{ field: 'test', operator: '==', value: 'value' }];
+      const filters = [{ field: 'test', operator: '==' as const, value: 'value' }];
       const result = await queryCollectionGroup('testCollection', filters);
 
       // Verify error response
