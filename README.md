@@ -1,5 +1,6 @@
 # Firebase MCP
 
+
 ![Project Logo](./assets/logo.png)
 
 <a href="https://glama.ai/mcp/servers/x4i8z2xmrq">
