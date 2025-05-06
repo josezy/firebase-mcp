@@ -282,5 +282,15 @@ describe('Authentication Client', () => {
         getUserByEmailSpy.mockRestore();
       }
     });
+
+    // Test error handling for invalid input (line 44 in authClient.ts)
+    it('should handle invalid input gracefully', async () => {
+      // Call the function with an empty string
+      const result = await getUserByIdOrEmail('');
+
+      // Verify error response
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toBe('User not found: ');
+    });
   });
 });

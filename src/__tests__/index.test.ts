@@ -19,7 +19,6 @@ const createServerMock = () => ({
 type ServerMock = ReturnType<typeof createServerMock>;
 
 // Mock Firestore document reference
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const createDocRefMock = (collection: string, id: string, data?: any) => ({
   id,
   path: `${collection}/${id}`,
@@ -66,7 +65,6 @@ type FirestoreMock = {
 };
 
 // Declare mock variables
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 let serverConstructor: any;
 let serverMock: ServerMock;
 let loggerMock: {
@@ -110,7 +108,6 @@ describe('Firebase MCP Server', () => {
     processExitMock = vi.fn();
     // Save original exit for cleanup if needed
     // const originalExit = process.exit;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     process.exit = processExitMock as any;
 
     // Create admin mock with Firestore

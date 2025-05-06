@@ -3,7 +3,6 @@
  * Avoids direct console usage which can interfere with MCP stdio
  */
 export const logger = {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   info: (message: string, ...args: any[]) => {
     process.stderr.write(`[INFO] ${message}\n`);
     if (args.length > 0) {
@@ -11,7 +10,6 @@ export const logger = {
     }
   },
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   error: (message: string, error?: any) => {
     process.stderr.write(`[ERROR] ${message}\n`);
     if (error) {
@@ -21,7 +19,6 @@ export const logger = {
     }
   },
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   debug: (message: string, ...args: any[]) => {
     process.stderr.write(`[DEBUG] ${message}\n`);
     if (args.length > 0) {
@@ -29,7 +26,6 @@ export const logger = {
     }
   },
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   warn: (message: string, ...args: any[]) => {
     process.stderr.write(`[WARN] ${message}\n`);
     if (args.length > 0) {

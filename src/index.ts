@@ -62,7 +62,6 @@ function initializeFirebase() {
 const app = initializeFirebase();
 
 // Response interface used throughout the codebase
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
 interface McpResponse {
   content: Array<{ type: string; text: string }>;
   isError?: boolean;
