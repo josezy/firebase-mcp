@@ -9,12 +9,9 @@
  * @module firebase-mcp/storage
  */
 
-import * as admin from 'firebase-admin';
 import axios from 'axios';
-import { getProjectId } from './firebaseConfig.js';
 import * as fs from 'fs';
 import * as path from 'path';
-import * as os from 'os';
 import { logger } from '../../utils/logger.js';
 
 /**
@@ -192,25 +189,38 @@ export function getBucketName(projectId: string): string {
 
 export async function getBucket() {
   try {
-    const serviceAccountPath = process.env.SERVICE_ACCOUNT_KEY_PATH;
-    if (!serviceAccountPath) {
-      return null;
-    }
+    logger.debug('getBucket called');
 
-    const projectId = getProjectId(serviceAccountPath);
-    if (!projectId) {
-      return null;
-    }
+    // Import Firebase admin directly
+    // This is a workaround for the import style mismatch
+    const adminModule = await import('firebase-admin');
+    logger.debug('Imported firebase-admin module directly');
 
     const storageBucket = process.env.FIREBASE_STORAGE_BUCKET;
-    if (storageBucket) {
-      return admin.storage().bucket(storageBucket);
+    if (!storageBucket) {
+      logger.error('FIREBASE_STORAGE_BUCKET not set in getBucket');
+      return null;
     }
+    logger.debug(`Storage bucket from env: ${storageBucket}`);
 
-    const possibleBucketNames = [`${projectId}.firebasestorage.app`, `${projectId}.appspot.com`];
+    try {
+      // Get the storage instance
+      const storage = adminModule.default.storage();
+      logger.debug(`Storage object obtained: ${storage ? 'yes' : 'no'}`);
 
-    return admin.storage().bucket(possibleBucketNames[0]);
-  } catch (_error) {
+      // Get the bucket
+      logger.debug(`Getting bucket with name: ${storageBucket}`);
+      const bucket = storage.bucket(storageBucket);
+      logger.debug(`Got bucket reference: ${bucket.name}`);
+      return bucket;
+    } catch (error) {
+      logger.error(
+        `Error getting storage bucket: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
+      return null;
+    }
+  } catch (error) {
+    logger.error(`Error in getBucket: ${error instanceof Error ? error.message : 'Unknown error'}`);
     return null;
   }
 }
@@ -372,6 +382,9 @@ export async function uploadFile(
   // Sanitize the file path for better URL compatibility
   filePath = sanitizeFilePath(filePath);
   try {
+    logger.debug(`Uploading file to: ${filePath}`);
+
+    // Get the bucket using the regular method
     const bucket = await getBucket();
     if (!bucket) {
       return {

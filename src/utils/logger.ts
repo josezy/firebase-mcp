@@ -5,8 +5,8 @@ import * as path from 'path';
  * Simple logger utility that wraps console methods
  * Avoids direct console usage which can interfere with MCP stdio
  *
- * Set DEBUG_LOG_FILE=true to enable file logging to debug.log in the project root
- * Or set DEBUG_LOG_FILE=/path/to/file.log to specify a custom log file
+ * Set DEBUG_LOG_FILE=true to enable file logging to debug.log in the current directory
+ * Or set DEBUG_LOG_FILE=/path/to/file.log to specify a custom log file path
  */
 
 // Check if file logging is enabled
@@ -20,16 +20,10 @@ let logFilePath: string | null = null;
 // Check if DEBUG_LOG_FILE is set to anything other than empty string
 if (DEBUG_LOG_FILE && DEBUG_LOG_FILE !== 'false' && DEBUG_LOG_FILE !== 'undefined') {
   try {
-    if (DEBUG_LOG_FILE === 'true') {
-      // Use absolute path with current working directory
-      const cwd = process.cwd();
-      logFilePath = path.join(cwd, 'debug.log');
-      process.stderr.write(`[DEBUG] Current working directory: ${cwd}\n`);
-      process.stderr.write(`[DEBUG] Absolute log file path: ${logFilePath}\n`);
-    } else {
-      // Use specified path
-      logFilePath = DEBUG_LOG_FILE;
-    }
+    // If DEBUG_LOG_FILE is set to a path (not just "true"), use that path directly
+    // Otherwise, use debug.log in the current directory
+    logFilePath = DEBUG_LOG_FILE === 'true' ? 'debug.log' : DEBUG_LOG_FILE;
+    process.stderr.write(`[DEBUG] Using log file path: ${logFilePath}\n`);
 
     // Test if we can write to the log file
     process.stderr.write(`[DEBUG] Testing if we can write to log file: ${logFilePath}\n`);
