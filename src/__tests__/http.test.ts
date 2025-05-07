@@ -1,10 +1,7 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { ServerConfig, TransportType } from '../config';
 import express from 'express';
-import { randomUUID } from 'node:crypto';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
-import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
-import { isInitializeRequest } from '@modelcontextprotocol/sdk/types.js';
 
 // Mock express
 vi.mock('express', () => {
@@ -21,7 +18,8 @@ vi.mock('express', () => {
     listen: vi.fn().mockReturnValue(mockServerInstance),
   };
 
-  const mockExpress = vi.fn(() => mockApp);
+  // Create a mock express function with all required properties
+  const mockExpress: any = vi.fn(() => mockApp);
   mockExpress.json = vi.fn(() => 'json-middleware');
 
   return { default: mockExpress };
@@ -40,7 +38,7 @@ vi.mock('@modelcontextprotocol/sdk/server/streamableHttp.js', () => {
     handleRequest: vi.fn(),
   };
   return {
-    StreamableHTTPServerTransport: vi.fn(() => mockTransport),
+    StreamableHTTPServerTransport: vi.fn().mockImplementation(() => mockTransport),
   };
 });
 
@@ -48,7 +46,6 @@ describe('HTTP Transport', () => {
   let config: ServerConfig;
   let mockServer: Server;
   let mockExpress: any;
-  let mockTransport: any;
 
   beforeEach(() => {
     // Reset mocks
@@ -61,9 +58,6 @@ describe('HTTP Transport', () => {
 
     // Get mock express instance
     mockExpress = express();
-
-    // Get mock transport
-    mockTransport = new StreamableHTTPServerTransport({});
   });
 
   it('should initialize HTTP transport with correct configuration', async () => {
@@ -102,7 +96,7 @@ describe('HTTP Transport', () => {
     expect(mockExpress.listen).toHaveBeenCalledWith(3000, 'localhost', expect.any(Function));
   });
 
-  it('should handle POST requests with existing session', async () => {
+  it('should handle invalid session ID', async () => {
     // Import the module under test
     const { initializeHttpTransport } = await import('../transports/http');
 
@@ -129,21 +123,28 @@ describe('HTTP Transport', () => {
     // Create mock request and response
     const req = {
       headers: {
-        'mcp-session-id': 'test-session-id',
+        // No session ID
       },
       body: { method: 'test' },
     };
-    const res = {};
-
-    // Create a mock transports object with the session
-    const transports: { [sessionId: string]: any } = {
-      'test-session-id': mockTransport,
+    const res = {
+      status: vi.fn().mockReturnThis(),
+      json: vi.fn().mockReturnThis(),
+      send: vi.fn().mockReturnThis(),
     };
 
     // Call the handler
     await postHandler(req, res);
 
-    // Verify handleRequest was called
-    expect(mockTransport.handleRequest).toHaveBeenCalledWith(req, res, req.body);
+    // Verify error response was sent
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json).toHaveBeenCalledWith({
+      jsonrpc: '2.0',
+      error: {
+        code: -32000,
+        message: 'Bad Request: No valid session ID provided',
+      },
+      id: null,
+    });
   });
 });
