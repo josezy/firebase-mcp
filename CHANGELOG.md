@@ -5,6 +5,32 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.0] - 2025-05-08
+
+### Added
+
+- Added streamable HTTP transport support as an alternative to stdio transport
+- Implemented HTTP server transport with Express for handling MCP requests
+- Added configuration options for HTTP port and host settings
+- Enhanced logger utility with file logging capabilities
+- Added support for debug log files with configurable paths
+- Added environment variable support through dotenv integration
+- Added comprehensive tests for HTTP transport functionality
+
+### Changed
+
+- Updated server initialization to support both stdio and HTTP transports
+- Enhanced error handling for Firebase initialization in all client methods
+- Updated module and moduleResolution options in tsconfig.json
+- Improved TypeScript type safety across the codebase
+- Enhanced ESLint configuration for better TypeScript support
+- Upgraded @modelcontextprotocol/sdk from 1.8.0 to 1.11.0 for streamable HTTP support
+
+### Fixed
+
+- Improved error handling throughout the application
+- Fixed type issues in Firestore query operations
+
 ## [1.3.5] - 2025-05-06
 
 ### Added
