@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.1] - 2025-05-08
+
+### Fixed
+
+- Fixed JSON parsing errors in tool responses by implementing consistent response formatting
+- Enhanced all tool handlers to use explicit JSON sanitization with `JSON.stringify()`
+- Added detailed debug logging for all tool responses to aid in troubleshooting
+- Ensured consistent use of `type: 'text'` for all content responses
+- Improved error handling and response formatting across all tools
+
 ## [1.4.0] - 2025-05-08
 
 ### Added
