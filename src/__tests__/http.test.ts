@@ -63,8 +63,18 @@ vi.mock('@modelcontextprotocol/sdk/server/streamableHttp.js', () => {
   // Create a factory function to ensure each test gets a fresh mock
   const createMockTransport = () => ({
     sessionId: 'test-session-id',
-    onclose: vi.fn(),
-    handleRequest: vi.fn().mockResolvedValue(undefined),
+    onclose: null,
+    handleRequest: vi.fn().mockImplementation(async (_req, res, _body) => {
+      // Simple implementation that just returns a success response
+      if (res && typeof res.status === 'function') {
+        res.status(200).json({ jsonrpc: '2.0', result: {}, id: '1' });
+      }
+      return Promise.resolve();
+    }),
+    handlePostRequest: vi.fn().mockResolvedValue(undefined),
+    handleGetRequest: vi.fn().mockResolvedValue(undefined),
+    handleDeleteRequest: vi.fn().mockResolvedValue(undefined),
+    handleUnsupportedRequest: vi.fn().mockResolvedValue(undefined),
   });
 
   // Store the current mock instance
