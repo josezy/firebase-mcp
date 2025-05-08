@@ -1,5 +1,6 @@
 # Firebase MCP
 
+
 ![Project Logo](./assets/logo.png)
 
 <a href="https://glama.ai/mcp/servers/x4i8z2xmrq">
@@ -101,7 +102,7 @@ Firebase MCP now offers powerful file upload capabilities with two specialized t
 2. **Base64 Data URL** (For smaller files)
    ```ts
    {
-     filePath: "my-image.png", 
+     filePath: "my-image.png",
      content: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAA..."
    }
    ```
@@ -134,8 +135,18 @@ Firebase MCP now offers powerful file upload capabilities with two specialized t
 
 ### 2. Environment Variables
 
+#### Required
 - `SERVICE_ACCOUNT_KEY_PATH`: Path to your Firebase service account key JSON (required)
-- `FIREBASE_STORAGE_BUCKET`: Bucket name for Firebase Storage (optional, defaults to `[projectId].appspot.com`)
+
+#### Optional
+- `FIREBASE_STORAGE_BUCKET`: Bucket name for Firebase Storage (defaults to `[projectId].appspot.com`)
+- `MCP_TRANSPORT`: Transport type to use (`stdio` or `http`) (defaults to `stdio`)
+- `MCP_HTTP_PORT`: Port for HTTP transport (defaults to `3000`)
+- `MCP_HTTP_HOST`: Host for HTTP transport (defaults to `localhost`)
+- `MCP_HTTP_PATH`: Path for HTTP transport (defaults to `/mcp`)
+- `DEBUG_LOG_FILE`: Enable file logging:
+  - Set to `true` to log to `~/.firebase-mcp/debug.log`
+  - Set to a file path to log to a custom location
 
 ### 3. Client Integration
 
@@ -220,6 +231,38 @@ src/
         └── storageClient.ts  # Storage operations
 ```
 
+## 🌐 HTTP Transport
+
+Firebase MCP now supports HTTP transport in addition to the default stdio transport. This allows you to run the server as a standalone HTTP service that can be accessed by multiple clients.
+
+### Running with HTTP Transport
+
+To run the server with HTTP transport:
+
+```bash
+# Using environment variables
+MCP_TRANSPORT=http MCP_HTTP_PORT=3000 node dist/index.js
+
+# Or with npx
+MCP_TRANSPORT=http MCP_HTTP_PORT=3000 npx @gannonh/firebase-mcp
+```
+
+### Client Configuration for HTTP
+
+When using HTTP transport, configure your MCP client to connect to the HTTP endpoint:
+
+```json
+{
+  "firebase-mcp": {
+    "url": "http://localhost:3000/mcp"
+  }
+}
+```
+
+### Session Management
+
+The HTTP transport supports session management, allowing multiple clients to connect to the same server instance. Each client receives a unique session ID that is used to maintain state between requests.
+
 ## 🔍 Troubleshooting
 
 ### Common Issues
@@ -239,6 +282,57 @@ If you receive "This query requires a composite index" error:
 1. Look for the provided URL in the error message
 2. Follow the link to create the required index in Firebase Console
 3. Retry your query after the index is created (may take a few minutes)
+
+### Debugging
+
+#### Enable File Logging
+To help diagnose issues, you can enable file logging:
+
+```bash
+# Log to default location (~/.firebase-mcp/debug.log)
+DEBUG_LOG_FILE=true npx @gannonh/firebase-mcp
+
+# Log to a custom location
+DEBUG_LOG_FILE=/path/to/custom/debug.log npx @gannonh/firebase-mcp
+```
+
+You can also enable logging in your MCP client configuration:
+
+```json
+{
+  "firebase-mcp": {
+    "command": "npx",
+    "args": ["-y", "@gannonh/firebase-mcp"],
+    "env": {
+      "SERVICE_ACCOUNT_KEY_PATH": "/path/to/serviceAccountKey.json",
+      "FIREBASE_STORAGE_BUCKET": "your-project-id.firebasestorage.app",
+      "DEBUG_LOG_FILE": "true"
+    }
+  }
+}
+```
+
+#### Real-time Log Viewing
+To view logs in real-time:
+
+```bash
+# Using tail to follow the log file
+tail -f ~/.firebase-mcp/debug.log
+
+# Using a split terminal to capture stderr
+npm start 2>&1 | tee logs.txt
+```
+
+#### Using MCP Inspector
+The MCP Inspector provides interactive debugging:
+
+```bash
+# Install MCP Inspector
+npm install -g @mcp/inspector
+
+# Connect to your MCP server
+mcp-inspector --connect stdio --command "node ./dist/index.js"
+```
 
 ## 📋 Response Formatting
 

@@ -166,6 +166,24 @@ describe('Firestore Client', () => {
       // Restore the original implementation
       vi.restoreAllMocks();
     });
+
+    // Test for error handling in getDocument when Firebase is not initialized (line 286)
+    it('should handle Firebase initialization errors in getDocument', async () => {
+      // Mock admin.firestore to throw an error
+      vi.spyOn(admin, 'firestore').mockImplementation(() => {
+        throw new Error('Firebase not initialized');
+      });
+
+      // Call the function
+      const result = await getDocument('testCollection', 'test-id');
+
+      // Verify error response
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toBe('Firebase not initialized');
+
+      // Restore the original implementation
+      vi.restoreAllMocks();
+    });
   });
 
   describe('addDocument', () => {
@@ -272,6 +290,24 @@ describe('Firestore Client', () => {
       // Restore the original implementation
       vi.restoreAllMocks();
     });
+
+    // Test for error handling in addDocument when Firebase is not initialized (line 232)
+    it('should handle Firebase initialization errors in addDocument', async () => {
+      // Mock admin.firestore to throw an error
+      vi.spyOn(admin, 'firestore').mockImplementation(() => {
+        throw new Error('Firebase not initialized');
+      });
+
+      // Call the function
+      const result = await addDocument('testCollection', { test: true });
+
+      // Verify error response
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toBe('Firebase not initialized');
+
+      // Restore the original implementation
+      vi.restoreAllMocks();
+    });
   });
 
   describe('updateDocument', () => {
@@ -365,6 +401,48 @@ describe('Firestore Client', () => {
         process.env.SERVICE_ACCOUNT_KEY_PATH = originalPath;
       }
     });
+
+    // Test for error handling in updateDocument when Firestore update fails (line 339)
+    it('should handle Firestore errors in updateDocument', async () => {
+      // Mock admin.firestore().collection().doc().update() to throw an error
+      const mockUpdate = vi.fn().mockRejectedValue(new Error('Firestore update error'));
+      const mockDoc = vi.fn().mockReturnValue({
+        update: mockUpdate,
+      });
+      const mockCollection = vi.fn().mockReturnValue({
+        doc: mockDoc,
+      });
+
+      vi.spyOn(admin.firestore(), 'collection').mockImplementation(mockCollection);
+
+      // Call the function
+      const result = await updateDocument('testCollection', 'test-id', { test: true });
+
+      // Verify error response
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain('Firestore update error');
+
+      // Restore the original implementation
+      vi.restoreAllMocks();
+    });
+
+    // Test for error handling in updateDocument when Firebase is not initialized (line 339)
+    it('should handle Firebase initialization errors in updateDocument', async () => {
+      // Mock admin.firestore to throw an error
+      vi.spyOn(admin, 'firestore').mockImplementation(() => {
+        throw new Error('Firebase not initialized');
+      });
+
+      // Call the function
+      const result = await updateDocument('testCollection', 'test-id', { test: true });
+
+      // Verify error response
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toBe('Firebase not initialized');
+
+      // Restore the original implementation
+      vi.restoreAllMocks();
+    });
   });
 
   describe('deleteDocument', () => {
@@ -438,6 +516,24 @@ describe('Firestore Client', () => {
       // Verify error response
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toBe(mockError.message);
+    });
+
+    // Test for error handling in deleteDocument when Firebase is not initialized (line 376)
+    it('should handle Firebase initialization errors in deleteDocument', async () => {
+      // Mock admin.firestore to throw an error
+      vi.spyOn(admin, 'firestore').mockImplementation(() => {
+        throw new Error('Firebase not initialized');
+      });
+
+      // Call the function
+      const result = await deleteDocument('testCollection', 'test-id');
+
+      // Verify error response
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toBe('Firebase not initialized');
+
+      // Restore the original implementation
+      vi.restoreAllMocks();
     });
   });
 
@@ -855,6 +951,24 @@ describe('Firestore Client', () => {
       // Verify error response
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toContain('Firestore list collections error');
+
+      // Restore the original implementation
+      vi.restoreAllMocks();
+    });
+
+    // Test for error handling in list_collections when Firebase is not initialized (line 77)
+    it('should handle Firebase initialization errors in list_collections', async () => {
+      // Mock admin.firestore to throw an error
+      vi.spyOn(admin, 'firestore').mockImplementation(() => {
+        throw new Error('Firebase not initialized');
+      });
+
+      // Call the function
+      const result = await list_collections();
+
+      // Verify error response
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toBe('Firebase not initialized');
 
       // Restore the original implementation
       vi.restoreAllMocks();
@@ -1320,6 +1434,58 @@ describe('Firestore Client', () => {
 
       // Restore the original implementation
       vi.restoreAllMocks();
+    });
+
+    // Test for JSON serialization errors in queryCollectionGroup (line 500)
+    it('should handle JSON serialization errors in queryCollectionGroup', async () => {
+      // Create a circular reference that will cause JSON.stringify to fail
+      const circularObj: any = {};
+      circularObj.circular = circularObj; // Create circular reference
+
+      // Mock the query result to include the circular reference
+      const mockDocs = [
+        {
+          id: 'doc1',
+          ref: { path: 'test/doc1', id: 'doc1' },
+          data: () => ({
+            name: 'Test Document',
+            circular: circularObj, // This will cause JSON.stringify to fail
+          }),
+        },
+      ];
+
+      // Mock the collection group query
+      const mockGet = vi.fn().mockResolvedValue({ docs: mockDocs });
+      const mockCollectionGroup = vi.fn().mockReturnValue({
+        where: vi.fn().mockReturnThis(),
+        orderBy: vi.fn().mockReturnThis(),
+        limit: vi.fn().mockReturnThis(),
+        startAfter: vi.fn().mockReturnThis(),
+        get: mockGet,
+      });
+
+      // Set up mocks
+      vi.spyOn(admin.firestore(), 'collectionGroup').mockImplementation(mockCollectionGroup);
+
+      // Set service account path to ensure code path is executed
+      const originalPath = process.env.SERVICE_ACCOUNT_KEY_PATH;
+      process.env.SERVICE_ACCOUNT_KEY_PATH = '/path/to/service-account.json';
+
+      // Mock getProjectId to return a valid project ID
+      vi.spyOn(firebaseConfig, 'getProjectId').mockReturnValue('test-project');
+
+      try {
+        // Call the function
+        const result = await queryCollectionGroup('testCollection');
+
+        // Verify error response
+        expect(result.isError).toBe(true);
+        expect(result.content[0].text).toContain('Converting circular structure to JSON');
+      } finally {
+        // Restore original values
+        process.env.SERVICE_ACCOUNT_KEY_PATH = originalPath;
+        vi.restoreAllMocks();
+      }
     });
   });
 });

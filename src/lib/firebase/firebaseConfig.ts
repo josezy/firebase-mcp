@@ -15,7 +15,6 @@
 
 import * as admin from 'firebase-admin';
 import fs from 'fs';
-import { logger } from '../../utils/logger';
 
 /**
  * Initializes the Firebase Admin SDK with service account credentials.
@@ -44,7 +43,7 @@ function initializeFirebase(): admin.app.App | null {
       if (existingApp) {
         return existingApp;
       }
-    } catch (_error) {
+    } catch {
       // No existing app, continue with initialization
     }
 
@@ -75,10 +74,10 @@ function initializeFirebase(): admin.app.App | null {
         credential: admin.credential.cert(serviceAccount as admin.ServiceAccount),
         storageBucket: storageBucket,
       });
-    } catch (_error) {
+    } catch {
       return null;
     }
-  } catch (_error) {
+  } catch {
     return null;
   }
 }
@@ -109,7 +108,7 @@ function getProjectId(serviceAccountPath: string): string | null {
     // Read and parse the service account file
     const serviceAccount = JSON.parse(fs.readFileSync(serviceAccountPath, 'utf8'));
     return serviceAccount.project_id || null;
-  } catch (_error) {
+  } catch {
     return null;
   }
 }

@@ -9,13 +9,11 @@
  * @module firebase-mcp/storage
  */
 
-import * as admin from 'firebase-admin';
 import axios from 'axios';
-import { getProjectId } from './firebaseConfig';
 import * as fs from 'fs';
 import * as path from 'path';
-import * as os from 'os';
-import { logger } from '../../utils/logger';
+// Firebase admin is imported dynamically in getBucket
+import { logger } from '../../utils/logger.js';
 
 /**
  * Detects content type from file path or data URL
@@ -130,6 +128,34 @@ export function getPublicUrl(bucketName: string, filePath: string): string {
 //const storage = admin.storage().bucket();
 
 /**
+ * Interface for Firebase Storage File objects
+ */
+interface StorageFile {
+  name: string;
+  metadata: Record<string, unknown>;
+  exists(): Promise<[boolean]>;
+  getMetadata(): Promise<[Record<string, unknown>]>;
+  getSignedUrl(options: { action: string; expires: number }): Promise<[string]>;
+  save(buffer: Buffer, options?: unknown): Promise<void>;
+}
+
+/**
+ * Interface for Firebase Storage Bucket objects
+ * This is a simplified version of the actual Firebase Bucket type
+ * that includes only the properties and methods we use
+ */
+interface StorageBucket {
+  name: string;
+  file(path: string): StorageFile;
+  getFiles(options?: {
+    prefix?: string;
+    delimiter?: string;
+    maxResults?: number;
+    pageToken?: string;
+  }): Promise<[StorageFile[], string | null]>;
+}
+
+/**
  * Standard response type for all Storage operations.
  * This interface defines the structure of responses returned by storage functions,
  * conforming to the MCP protocol requirements.
@@ -190,27 +216,41 @@ export function getBucketName(projectId: string): string {
   return possibleBucketNames[0]; // Default to first format
 }
 
-export async function getBucket() {
+export async function getBucket(): Promise<StorageBucket | null> {
   try {
-    const serviceAccountPath = process.env.SERVICE_ACCOUNT_KEY_PATH;
-    if (!serviceAccountPath) {
-      return null;
-    }
+    logger.debug('getBucket called');
 
-    const projectId = getProjectId(serviceAccountPath);
-    if (!projectId) {
-      return null;
-    }
+    // Import Firebase admin directly
+    // This is a workaround for the import style mismatch
+    const adminModule = await import('firebase-admin');
+    logger.debug('Imported firebase-admin module directly');
 
     const storageBucket = process.env.FIREBASE_STORAGE_BUCKET;
-    if (storageBucket) {
-      return admin.storage().bucket(storageBucket);
+    if (!storageBucket) {
+      logger.error('FIREBASE_STORAGE_BUCKET not set in getBucket');
+      return null;
     }
+    logger.debug(`Storage bucket from env: ${storageBucket}`);
 
-    const possibleBucketNames = [`${projectId}.firebasestorage.app`, `${projectId}.appspot.com`];
+    try {
+      // Get the storage instance
+      const storage = adminModule.default.storage();
+      logger.debug(`Storage object obtained: ${storage ? 'yes' : 'no'}`);
 
-    return admin.storage().bucket(possibleBucketNames[0]);
-  } catch (_error) {
+      // Get the bucket
+      logger.debug(`Getting bucket with name: ${storageBucket}`);
+      const bucket = storage.bucket(storageBucket);
+      logger.debug(`Got bucket reference: ${bucket.name}`);
+      // Use type assertion to match our simplified interface
+      return bucket as unknown as StorageBucket;
+    } catch (error) {
+      logger.error(
+        `Error getting storage bucket: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
+      return null;
+    }
+  } catch (error) {
+    logger.error(`Error in getBucket: ${error instanceof Error ? error.message : 'Unknown error'}`);
     return null;
   }
 }
@@ -257,7 +297,7 @@ export async function listDirectoryFiles(
       pageToken,
     });
 
-    const fileList = files.map(file => ({
+    const fileList = files.map((file: { name: string; metadata: Record<string, unknown> }) => ({
       name: file.name,
       size: file.metadata.size,
       contentType: file.metadata.contentType,
@@ -367,11 +407,14 @@ export async function uploadFile(
   filePath: string,
   content: string,
   contentType?: string,
-  metadata?: Record<string, any>
+  metadata?: Record<string, unknown>
 ): Promise<StorageResponse> {
   // Sanitize the file path for better URL compatibility
   filePath = sanitizeFilePath(filePath);
   try {
+    logger.debug(`Uploading file to: ${filePath}`);
+
+    // Get the bucket using the regular method
     const bucket = await getBucket();
     if (!bucket) {
       return {
@@ -422,7 +465,7 @@ export async function uploadFile(
 
                 // If we get here, the repair worked
                 logger.debug('Base64 data was repaired successfully');
-              } catch (error) {
+              } catch {
                 return {
                   content: [
                     {
@@ -613,7 +656,7 @@ export async function uploadFileFromUrl(
   filePath: string,
   url: string,
   contentType?: string,
-  metadata?: Record<string, any>
+  metadata?: Record<string, unknown>
 ): Promise<StorageResponse> {
   // Sanitize the file path for better URL compatibility
   filePath = sanitizeFilePath(filePath);
