@@ -528,17 +528,23 @@ class FirebaseMcpServer {
 
             const docRef = await admin.firestore().collection(collection).add(processedData);
 
-            return {
+            // Ensure clean JSON by parsing and re-stringifying
+            const sanitizedJson = JSON.stringify({
+              id: docRef.id,
+              path: docRef.path,
+            });
+
+            // Log the response for debugging
+            const response = {
               content: [
                 {
                   type: 'text',
-                  text: JSON.stringify({
-                    id: docRef.id,
-                    path: docRef.path,
-                  }),
+                  text: sanitizedJson,
                 },
               ],
             };
+            logger.debug('firestore_add_document response:', JSON.stringify(response));
+            return response;
           }
 
           case 'firestore_list_documents': {
@@ -655,17 +661,23 @@ class FirebaseMcpServer {
             const lastVisible = snapshot.docs[snapshot.docs.length - 1];
             const nextPageToken = lastVisible ? lastVisible.ref.path : null;
 
-            return {
+            // Ensure clean JSON by parsing and re-stringifying
+            const sanitizedJson = JSON.stringify({
+              documents,
+              nextPageToken,
+            });
+
+            // Log the response for debugging
+            const response = {
               content: [
                 {
                   type: 'text',
-                  text: JSON.stringify({
-                    documents,
-                    nextPageToken,
-                  }),
+                  text: sanitizedJson,
                 },
               ],
             };
+            logger.debug('firestore_list_documents response:', JSON.stringify(response));
+            return response;
           }
 
           case 'firestore_get_document': {
@@ -676,16 +688,22 @@ class FirebaseMcpServer {
             const doc = await docRef.get();
 
             if (!doc.exists) {
-              return {
+              // Ensure clean JSON by parsing and re-stringifying
+              const sanitizedJson = JSON.stringify({
+                error: 'Document not found',
+              });
+
+              // Log the response for debugging
+              const response = {
                 content: [
                   {
                     type: 'text',
-                    text: JSON.stringify({
-                      error: 'Document not found',
-                    }),
+                    text: sanitizedJson,
                   },
                 ],
               };
+              logger.debug('firestore_get_document error response:', JSON.stringify(response));
+              return response;
             }
 
             const rawData = doc.data();
@@ -715,18 +733,24 @@ class FirebaseMcpServer {
               {} as Record<string, unknown>
             );
 
-            return {
+            // Ensure clean JSON by parsing and re-stringifying
+            const sanitizedJson = JSON.stringify({
+              id: doc.id,
+              path: doc.ref.path,
+              data,
+            });
+
+            // Log the response for debugging
+            const response = {
               content: [
                 {
                   type: 'text',
-                  text: JSON.stringify({
-                    id: doc.id,
-                    path: doc.ref.path,
-                    data,
-                  }),
+                  text: sanitizedJson,
                 },
               ],
             };
+            logger.debug('firestore_get_document response:', JSON.stringify(response));
+            return response;
           }
 
           case 'firestore_update_document': {
@@ -766,18 +790,24 @@ class FirebaseMcpServer {
             const docRef = admin.firestore().collection(collection).doc(id);
             await docRef.update(processedData);
 
-            return {
+            // Ensure clean JSON by parsing and re-stringifying
+            const sanitizedJson = JSON.stringify({
+              id,
+              path: docRef.path,
+              updated: true,
+            });
+
+            // Log the response for debugging
+            const response = {
               content: [
                 {
                   type: 'text',
-                  text: JSON.stringify({
-                    id,
-                    path: docRef.path,
-                    updated: true,
-                  }),
+                  text: sanitizedJson,
                 },
               ],
             };
+            logger.debug('firestore_update_document response:', JSON.stringify(response));
+            return response;
           }
 
           case 'firestore_delete_document': {
@@ -787,18 +817,24 @@ class FirebaseMcpServer {
             const docRef = admin.firestore().collection(collection).doc(id);
             await docRef.delete();
 
-            return {
+            // Ensure clean JSON by parsing and re-stringifying
+            const sanitizedJson = JSON.stringify({
+              id,
+              path: docRef.path,
+              deleted: true,
+            });
+
+            // Log the response for debugging
+            const response = {
               content: [
                 {
                   type: 'text',
-                  text: JSON.stringify({
-                    id,
-                    path: docRef.path,
-                    deleted: true,
-                  }),
+                  text: sanitizedJson,
                 },
               ],
             };
+            logger.debug('firestore_delete_document response:', JSON.stringify(response));
+            return response;
           }
 
           case 'auth_get_user': {
@@ -830,26 +866,38 @@ class FirebaseMcpServer {
                 },
               };
 
-              return {
+              // Ensure clean JSON by parsing and re-stringifying
+              const sanitizedJson = JSON.stringify({ user: sanitizedUser });
+
+              // Log the response for debugging
+              const response = {
                 content: [
                   {
                     type: 'text',
-                    text: JSON.stringify({ user: sanitizedUser }),
+                    text: sanitizedJson,
                   },
                 ],
               };
+              logger.debug('auth_get_user response:', JSON.stringify(response));
+              return response;
             } catch (error) {
-              return {
+              // Ensure clean JSON by parsing and re-stringifying
+              const sanitizedJson = JSON.stringify({
+                error: 'User not found',
+                details: error instanceof Error ? error.message : 'Unknown error',
+              });
+
+              // Log the response for debugging
+              const response = {
                 content: [
                   {
                     type: 'text',
-                    text: JSON.stringify({
-                      error: 'User not found',
-                      details: error instanceof Error ? error.message : 'Unknown error',
-                    }),
+                    text: sanitizedJson,
                   },
                 ],
               };
+              logger.debug('auth_get_user error response:', JSON.stringify(response));
+              return response;
             }
           }
 
@@ -876,27 +924,39 @@ class FirebaseMcpServer {
                 md5Hash: file.metadata.md5Hash || null,
               }));
 
-              return {
+              // Ensure clean JSON by parsing and re-stringifying
+              const sanitizedJson = JSON.stringify({ files: fileList });
+
+              // Log the response for debugging
+              const response = {
                 content: [
                   {
                     type: 'text',
-                    text: JSON.stringify({ files: fileList }, null, 2),
+                    text: sanitizedJson,
                   },
                 ],
               };
+              logger.debug('storage_list_files response:', JSON.stringify(response));
+              return response;
             } catch (error) {
               logger.error('Failed to list files', error);
-              return {
+              // Ensure clean JSON by parsing and re-stringifying
+              const sanitizedJson = JSON.stringify({
+                error: 'Failed to list files',
+                details: error instanceof Error ? error.message : 'Unknown error',
+              });
+
+              // Log the response for debugging
+              const response = {
                 content: [
                   {
                     type: 'text',
-                    text: JSON.stringify({
-                      error: 'Failed to list files',
-                      details: error instanceof Error ? error.message : 'Unknown error',
-                    }),
+                    text: sanitizedJson,
                   },
                 ],
               };
+              logger.debug('storage_list_files error response:', JSON.stringify(response));
+              return response;
             }
           }
 
@@ -913,20 +973,22 @@ class FirebaseMcpServer {
 
               if (!exists) {
                 logger.warn(`File not found: ${filePath}`);
-                return {
+                // Ensure clean JSON by parsing and re-stringifying
+                const sanitizedJson = JSON.stringify({
+                  error: 'File not found',
+                });
+
+                // Log the response for debugging
+                const response = {
                   content: [
                     {
                       type: 'text',
-                      text: JSON.stringify(
-                        {
-                          error: 'File not found',
-                        },
-                        null,
-                        2
-                      ),
+                      text: sanitizedJson,
                     },
                   ],
                 };
+                logger.debug('storage_get_file_info error response:', JSON.stringify(response));
+                return response;
               }
 
               logger.debug('File exists, getting metadata and signed URL');
@@ -946,27 +1008,39 @@ class FirebaseMcpServer {
                 downloadUrl: url,
               };
 
-              return {
+              // Ensure clean JSON by parsing and re-stringifying
+              const sanitizedJson = JSON.stringify(fileInfo);
+
+              // Log the response for debugging
+              const response = {
                 content: [
                   {
                     type: 'text',
-                    text: JSON.stringify(fileInfo, null, 2),
+                    text: sanitizedJson,
                   },
                 ],
               };
+              logger.debug('storage_get_file_info response:', JSON.stringify(response));
+              return response;
             } catch (error) {
               logger.error('Failed to get file info', error);
-              return {
+              // Ensure clean JSON by parsing and re-stringifying
+              const sanitizedJson = JSON.stringify({
+                error: 'Failed to get file info',
+                details: error instanceof Error ? error.message : 'Unknown error',
+              });
+
+              // Log the response for debugging
+              const response = {
                 content: [
                   {
                     type: 'text',
-                    text: JSON.stringify({
-                      error: 'Failed to get file info',
-                      details: error instanceof Error ? error.message : 'Unknown error',
-                    }),
+                    text: sanitizedJson,
                   },
                 ],
               };
+              logger.debug('storage_get_file_info error response:', JSON.stringify(response));
+              return response;
             }
           }
 
@@ -986,7 +1060,8 @@ class FirebaseMcpServer {
 
               // Check if there's an error
               if (result.isError) {
-                return {
+                // Log the response for debugging
+                const response = {
                   content: [
                     {
                       type: 'text',
@@ -995,23 +1070,32 @@ class FirebaseMcpServer {
                   ],
                   error: true,
                 };
+                logger.debug('storage_upload error response:', JSON.stringify(response));
+                return response;
               }
 
               // Extract the file info from the JSON response
               try {
                 const fileInfo = JSON.parse(result.content[0].text);
 
-                return {
+                // Ensure clean JSON by parsing and re-stringifying
+                const sanitizedJson = JSON.stringify(fileInfo);
+
+                // Log the response for debugging
+                const response = {
                   content: [
                     {
                       type: 'text',
-                      text: JSON.stringify(fileInfo, null, 2),
+                      text: sanitizedJson,
                     },
                   ],
                 };
+                logger.debug('storage_upload success response:', JSON.stringify(response));
+                return response;
               } catch {
                 // If parsing fails, return the original text
-                return {
+                // Log the response for debugging
+                const response = {
                   content: [
                     {
                       type: 'text',
@@ -1019,20 +1103,28 @@ class FirebaseMcpServer {
                     },
                   ],
                 };
+                logger.debug('storage_upload fallback response:', JSON.stringify(response));
+                return response;
               }
             } catch (error) {
               logger.error('Failed to upload file', error);
-              return {
+              // Ensure clean JSON by parsing and re-stringifying
+              const sanitizedJson = JSON.stringify({
+                error: 'Failed to upload file',
+                details: error instanceof Error ? error.message : 'Unknown error',
+              });
+
+              // Log the response for debugging
+              const response = {
                 content: [
                   {
                     type: 'text',
-                    text: JSON.stringify({
-                      error: 'Failed to upload file',
-                      details: error instanceof Error ? error.message : 'Unknown error',
-                    }),
+                    text: sanitizedJson,
                   },
                 ],
               };
+              logger.debug('storage_upload catch error response:', JSON.stringify(response));
+              return response;
             }
           }
 
@@ -1052,7 +1144,8 @@ class FirebaseMcpServer {
 
               // Check if there's an error
               if (result.isError) {
-                return {
+                // Log the response for debugging
+                const response = {
                   content: [
                     {
                       type: 'text',
@@ -1061,23 +1154,32 @@ class FirebaseMcpServer {
                   ],
                   error: true,
                 };
+                logger.debug('storage_upload_from_url error response:', JSON.stringify(response));
+                return response;
               }
 
               // Extract the file info from the JSON response
               try {
                 const fileInfo = JSON.parse(result.content[0].text);
 
-                return {
+                // Ensure clean JSON by parsing and re-stringifying
+                const sanitizedJson = JSON.stringify(fileInfo);
+
+                // Log the response for debugging
+                const response = {
                   content: [
                     {
                       type: 'text',
-                      text: JSON.stringify(fileInfo, null, 2),
+                      text: sanitizedJson,
                     },
                   ],
                 };
+                logger.debug('storage_upload_from_url success response:', JSON.stringify(response));
+                return response;
               } catch {
                 // If parsing fails, return the original text
-                return {
+                // Log the response for debugging
+                const response = {
                   content: [
                     {
                       type: 'text',
@@ -1085,20 +1187,34 @@ class FirebaseMcpServer {
                     },
                   ],
                 };
+                logger.debug(
+                  'storage_upload_from_url fallback response:',
+                  JSON.stringify(response)
+                );
+                return response;
               }
             } catch (error) {
               logger.error('Failed to upload file from URL', error);
-              return {
+              // Ensure clean JSON by parsing and re-stringifying
+              const sanitizedJson = JSON.stringify({
+                error: 'Failed to upload file from URL',
+                details: error instanceof Error ? error.message : 'Unknown error',
+              });
+
+              // Log the response for debugging
+              const response = {
                 content: [
                   {
                     type: 'text',
-                    text: JSON.stringify({
-                      error: 'Failed to upload file from URL',
-                      details: error instanceof Error ? error.message : 'Unknown error',
-                    }),
+                    text: sanitizedJson,
                   },
                 ],
               };
+              logger.debug(
+                'storage_upload_from_url catch error response:',
+                JSON.stringify(response)
+              );
+              return response;
             }
           }
 
@@ -1109,14 +1225,20 @@ class FirebaseMcpServer {
               path: collection.path,
             }));
 
-            return {
+            // Ensure clean JSON by parsing and re-stringifying
+            const sanitizedJson = JSON.stringify({ collections: collectionList });
+
+            // Log the response for debugging
+            const response = {
               content: [
                 {
                   type: 'text',
-                  text: JSON.stringify({ collections: collectionList }),
+                  text: sanitizedJson,
                 },
               ],
             };
+            logger.debug('firestore_list_collections response:', JSON.stringify(response));
+            return response;
 
           case 'firestore_query_collection_group': {
             const collectionId = args.collectionId as string;
@@ -1239,17 +1361,23 @@ class FirebaseMcpServer {
               const lastVisible = snapshot.docs[snapshot.docs.length - 1];
               const nextPageToken = lastVisible ? lastVisible.ref.path : null;
 
-              return {
+              // Ensure clean JSON by parsing and re-stringifying
+              const sanitizedJson = JSON.stringify({
+                documents,
+                nextPageToken,
+              });
+
+              // Log the response for debugging
+              const response = {
                 content: [
                   {
                     type: 'text',
-                    text: JSON.stringify({
-                      documents,
-                      nextPageToken,
-                    }),
+                    text: sanitizedJson,
                   },
                 ],
               };
+              logger.debug('firestore_query_collection_group response:', JSON.stringify(response));
+              return response;
             } catch (error) {
               logger.error('Error in collection group query:', error);
 
@@ -1262,32 +1390,50 @@ class FirebaseMcpServer {
                 const indexUrl = errorMessage.match(
                   /https:\/\/console\.firebase\.google\.com[^\s]*/
                 )?.[0];
-                return {
+                // Ensure clean JSON by parsing and re-stringifying
+                const sanitizedJson = JSON.stringify({
+                  error: 'This query requires a composite index.',
+                  details:
+                    'When ordering by multiple fields or combining filters with ordering, you need to create a composite index.',
+                  indexUrl: indexUrl || null,
+                  message: errorMessage,
+                });
+
+                // Log the response for debugging
+                const response = {
                   content: [
                     {
                       type: 'text',
-                      text: JSON.stringify({
-                        error: 'This query requires a composite index.',
-                        details:
-                          'When ordering by multiple fields or combining filters with ordering, you need to create a composite index.',
-                        indexUrl: indexUrl || null,
-                        message: errorMessage,
-                      }),
+                      text: sanitizedJson,
                     },
                   ],
                 };
+                logger.debug(
+                  'firestore_query_collection_group index error response:',
+                  JSON.stringify(response)
+                );
+                return response;
               }
 
-              return {
+              // Ensure clean JSON by parsing and re-stringifying
+              const sanitizedJson = JSON.stringify({
+                error: errorMessage,
+              });
+
+              // Log the response for debugging
+              const response = {
                 content: [
                   {
                     type: 'text',
-                    text: JSON.stringify({
-                      error: errorMessage,
-                    }),
+                    text: sanitizedJson,
                   },
                 ],
               };
+              logger.debug(
+                'firestore_query_collection_group error response:',
+                JSON.stringify(response)
+              );
+              return response;
             }
           }
 
@@ -1305,31 +1451,43 @@ class FirebaseMcpServer {
           const indexUrl = errorMessage.match(
             /https:\/\/console\.firebase\.google\.com[^\s]*/
           )?.[0];
-          return {
+          // Ensure clean JSON by parsing and re-stringifying
+          const sanitizedJson = JSON.stringify({
+            error: 'This query requires a composite index.',
+            details:
+              'When ordering by multiple fields or combining filters with ordering, you need to create a composite index.',
+            indexUrl: indexUrl || null,
+          });
+
+          // Log the response for debugging
+          const response = {
             content: [
               {
                 type: 'text',
-                text: JSON.stringify({
-                  error: 'This query requires a composite index.',
-                  details:
-                    'When ordering by multiple fields or combining filters with ordering, you need to create a composite index.',
-                  indexUrl: indexUrl || null,
-                }),
+                text: sanitizedJson,
               },
             ],
           };
+          logger.debug('global index error response:', JSON.stringify(response));
+          return response;
         }
 
-        return {
+        // Ensure clean JSON by parsing and re-stringifying
+        const sanitizedJson = JSON.stringify({
+          error: errorMessage,
+        });
+
+        // Log the response for debugging
+        const response = {
           content: [
             {
               type: 'text',
-              text: JSON.stringify({
-                error: errorMessage,
-              }),
+              text: sanitizedJson,
             },
           ],
         };
+        logger.debug('global error response:', JSON.stringify(response));
+        return response;
       }
     });
   }
