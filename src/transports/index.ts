@@ -7,10 +7,10 @@
  * @module firebase-mcp/transports
  */
 
-import { Server } from '@modelcontextprotocol/sdk/server/index.js';
+import type { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { initializeHttpTransport } from './http.js';
-import { ServerConfig, TransportType, isHttpServerRunning } from '../config.js';
+import { TransportType, isHttpServerRunning, type ServerConfig } from '../config.js';
 import { logger } from '../utils/logger.js';
 
 /**

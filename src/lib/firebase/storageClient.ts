@@ -12,6 +12,7 @@
 import axios from 'axios';
 import * as fs from 'fs';
 import * as path from 'path';
+// Firebase admin is imported dynamically in getBucket
 import { logger } from '../../utils/logger.js';
 
 /**
@@ -127,6 +128,34 @@ export function getPublicUrl(bucketName: string, filePath: string): string {
 //const storage = admin.storage().bucket();
 
 /**
+ * Interface for Firebase Storage File objects
+ */
+interface StorageFile {
+  name: string;
+  metadata: Record<string, unknown>;
+  exists(): Promise<[boolean]>;
+  getMetadata(): Promise<[Record<string, unknown>]>;
+  getSignedUrl(options: { action: string; expires: number }): Promise<[string]>;
+  save(buffer: Buffer, options?: unknown): Promise<void>;
+}
+
+/**
+ * Interface for Firebase Storage Bucket objects
+ * This is a simplified version of the actual Firebase Bucket type
+ * that includes only the properties and methods we use
+ */
+interface StorageBucket {
+  name: string;
+  file(path: string): StorageFile;
+  getFiles(options?: {
+    prefix?: string;
+    delimiter?: string;
+    maxResults?: number;
+    pageToken?: string;
+  }): Promise<[StorageFile[], string | null]>;
+}
+
+/**
  * Standard response type for all Storage operations.
  * This interface defines the structure of responses returned by storage functions,
  * conforming to the MCP protocol requirements.
@@ -187,7 +216,7 @@ export function getBucketName(projectId: string): string {
   return possibleBucketNames[0]; // Default to first format
 }
 
-export async function getBucket() {
+export async function getBucket(): Promise<StorageBucket | null> {
   try {
     logger.debug('getBucket called');
 
@@ -212,7 +241,8 @@ export async function getBucket() {
       logger.debug(`Getting bucket with name: ${storageBucket}`);
       const bucket = storage.bucket(storageBucket);
       logger.debug(`Got bucket reference: ${bucket.name}`);
-      return bucket;
+      // Use type assertion to match our simplified interface
+      return bucket as unknown as StorageBucket;
     } catch (error) {
       logger.error(
         `Error getting storage bucket: ${error instanceof Error ? error.message : 'Unknown error'}`
@@ -267,7 +297,7 @@ export async function listDirectoryFiles(
       pageToken,
     });
 
-    const fileList = files.map(file => ({
+    const fileList = files.map((file: { name: string; metadata: Record<string, unknown> }) => ({
       name: file.name,
       size: file.metadata.size,
       contentType: file.metadata.contentType,
@@ -377,7 +407,7 @@ export async function uploadFile(
   filePath: string,
   content: string,
   contentType?: string,
-  metadata?: Record<string, any>
+  metadata?: Record<string, unknown>
 ): Promise<StorageResponse> {
   // Sanitize the file path for better URL compatibility
   filePath = sanitizeFilePath(filePath);
@@ -435,7 +465,7 @@ export async function uploadFile(
 
                 // If we get here, the repair worked
                 logger.debug('Base64 data was repaired successfully');
-              } catch (error) {
+              } catch {
                 return {
                   content: [
                     {
@@ -626,7 +656,7 @@ export async function uploadFileFromUrl(
   filePath: string,
   url: string,
   contentType?: string,
-  metadata?: Record<string, any>
+  metadata?: Record<string, unknown>
 ): Promise<StorageResponse> {
   // Sanitize the file path for better URL compatibility
   filePath = sanitizeFilePath(filePath);

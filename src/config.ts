@@ -86,7 +86,7 @@ export async function isHttpServerRunning(host: string, port: number): Promise<b
 
     clearTimeout(timeoutId);
     return true;
-  } catch (error) {
+  } catch {
     return false;
   }
 }

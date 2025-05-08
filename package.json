@@ -29,6 +29,7 @@
     "lint": "eslint 'src/**/*.ts'",
     "lint:fix": "eslint 'src/**/*.ts' --fix",
     "format": "prettier --write \"src/**/*.{ts,tsx}\"",
+    "fix": "npm run lint:fix && npm run format",
     "format:check": "prettier --check \"src/**/*.{ts,tsx}\"",
     "preflight": "npm run format && npm run lint && npm run build && npm run test:coverage:emulator && npm ls --depth=0",
     "preflight:prod": "npm run format && npm run lint && npm run build && npm run test:coverage && npm ls --depth=0",

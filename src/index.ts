@@ -25,7 +25,7 @@ import { initializeTransport } from './transports/index.js';
 import * as fs from 'fs';
 
 // Initialize Firebase
-async function initializeFirebase() {
+async function initializeFirebase(): Promise<admin.app.App | null> {
   try {
     const serviceAccountPath = config.serviceAccountKeyPath;
     if (!serviceAccountPath) {
@@ -39,7 +39,7 @@ async function initializeFirebase() {
         logger.debug('Using existing Firebase app');
         return existingApp;
       }
-    } catch (_error) {
+    } catch {
       // No existing app, continue with initialization
       logger.debug('No existing Firebase app, initializing new one');
     }
@@ -82,11 +82,12 @@ let app: admin.app.App | null = null;
   app = await initializeFirebase();
 })();
 
-// Response interface used throughout the codebase
-interface McpResponse {
-  content: Array<{ type: string; text: string }>;
-  isError?: boolean;
-}
+// This interface was previously used but is now handled by the SDK
+// Keeping it commented for reference
+// interface FirebaseToolResponse {
+//   content: Array<{ type: string; text: string }>;
+//   isError?: boolean;
+// }
 
 /**
  * Main server class that implements the MCP protocol for Firebase services.
@@ -127,7 +128,7 @@ class FirebaseMcpServer {
    * This includes tools for Firestore, Authentication, and Storage operations.
    * @private
    */
-  private setupToolHandlers() {
+  private setupToolHandlers(): void {
     // Register available tools
     this.server.setRequestHandler(ListToolsRequestSchema, async () => ({
       tools: [
@@ -494,7 +495,7 @@ class FirebaseMcpServer {
         switch (name) {
           case 'firestore_add_document': {
             const collection = args.collection as string;
-            const data = args.data as Record<string, any>;
+            const data = args.data as Record<string, unknown>;
 
             // Process server timestamps and convert ISO date strings to Timestamps
             const processedData = Object.entries(data).reduce(
@@ -512,7 +513,7 @@ class FirebaseMcpServer {
                     // Convert ISO string to Timestamp for Firestore
                     acc[key] = admin.firestore.Timestamp.fromDate(new Date(value));
                     logger.debug(`Converted string date to Timestamp: ${value}`);
-                  } catch (e) {
+                  } catch {
                     // If conversion fails, use the original value
                     logger.warn(`Failed to convert date string to Timestamp: ${value}`);
                     acc[key] = value;
@@ -522,7 +523,7 @@ class FirebaseMcpServer {
                 }
                 return acc;
               },
-              {} as Record<string, any>
+              {} as Record<string, unknown>
             );
 
             const docRef = await admin.firestore().collection(collection).add(processedData);
@@ -551,7 +552,7 @@ class FirebaseMcpServer {
               | Array<{
                   field: string;
                   operator: admin.firestore.WhereFilterOp;
-                  value: any;
+                  value: unknown;
                 }>
               | undefined;
 
@@ -567,7 +568,7 @@ class FirebaseMcpServer {
                   try {
                     // Convert ISO string to Timestamp for Firestore queries
                     filterValue = admin.firestore.Timestamp.fromDate(new Date(filterValue));
-                  } catch (e) {
+                  } catch {
                     // If conversion fails, use the original value
                     logger.warn(`Failed to convert timestamp string to Timestamp: ${filterValue}`);
                   }
@@ -640,7 +641,7 @@ class FirebaseMcpServer {
                   }
                   return acc;
                 },
-                {} as Record<string, any>
+                {} as Record<string, unknown>
               );
 
               return {
@@ -711,7 +712,7 @@ class FirebaseMcpServer {
                 }
                 return acc;
               },
-              {} as Record<string, any>
+              {} as Record<string, unknown>
             );
 
             return {
@@ -731,7 +732,7 @@ class FirebaseMcpServer {
           case 'firestore_update_document': {
             const collection = args.collection as string;
             const id = args.id as string;
-            const data = args.data as Record<string, any>;
+            const data = args.data as Record<string, unknown>;
 
             // Process server timestamps and convert ISO date strings to Timestamps
             const processedData = Object.entries(data).reduce(
@@ -749,7 +750,7 @@ class FirebaseMcpServer {
                     // Convert ISO string to Timestamp for Firestore
                     acc[key] = admin.firestore.Timestamp.fromDate(new Date(value));
                     logger.debug(`Converted string date to Timestamp: ${value}`);
-                  } catch (e) {
+                  } catch {
                     // If conversion fails, use the original value
                     logger.warn(`Failed to convert date string to Timestamp: ${value}`);
                     acc[key] = value;
@@ -759,7 +760,7 @@ class FirebaseMcpServer {
                 }
                 return acc;
               },
-              {} as Record<string, any>
+              {} as Record<string, unknown>
             );
 
             const docRef = admin.firestore().collection(collection).doc(id);
@@ -980,7 +981,7 @@ class FirebaseMcpServer {
                 filePath as string,
                 content as string,
                 contentType as string | undefined,
-                metadata as Record<string, any> | undefined
+                metadata as Record<string, unknown> | undefined
               );
 
               // Check if there's an error
@@ -1008,7 +1009,7 @@ class FirebaseMcpServer {
                     },
                   ],
                 };
-              } catch (error) {
+              } catch {
                 // If parsing fails, return the original text
                 return {
                   content: [
@@ -1046,7 +1047,7 @@ class FirebaseMcpServer {
                 filePath as string,
                 url as string,
                 contentType as string | undefined,
-                metadata as Record<string, any> | undefined
+                metadata as Record<string, unknown> | undefined
               );
 
               // Check if there's an error
@@ -1074,7 +1075,7 @@ class FirebaseMcpServer {
                     },
                   ],
                 };
-              } catch (error) {
+              } catch {
                 // If parsing fails, return the original text
                 return {
                   content: [
@@ -1123,14 +1124,14 @@ class FirebaseMcpServer {
 
             try {
               // Use the collectionGroup API directly here instead of importing
-              let query: any = admin.firestore().collectionGroup(collectionId);
+              let query: FirebaseFirestore.Query = admin.firestore().collectionGroup(collectionId);
 
               // Apply filters if provided
               const filters = args.filters as
                 | Array<{
                     field: string;
                     operator: admin.firestore.WhereFilterOp;
-                    value: any;
+                    value: unknown;
                   }>
                 | undefined;
 
@@ -1146,7 +1147,7 @@ class FirebaseMcpServer {
                     try {
                       // Convert ISO string to Timestamp for Firestore queries
                       filterValue = admin.firestore.Timestamp.fromDate(new Date(filterValue));
-                    } catch (e) {
+                    } catch {
                       // If conversion fails, use the original value
                       logger.warn(
                         `Failed to convert timestamp string to Timestamp: ${filterValue}`
@@ -1223,7 +1224,7 @@ class FirebaseMcpServer {
                       }
                       return acc;
                     },
-                    {} as Record<string, any>
+                    {} as Record<string, unknown>
                   );
 
                   return {
@@ -1337,7 +1338,7 @@ class FirebaseMcpServer {
    * Starts the MCP server using the configured transport.
    * This method initializes the appropriate transport based on configuration.
    */
-  async run() {
+  async run(): Promise<void> {
     // Wait for Firebase to initialize
     if (!app) {
       logger.info('Waiting for Firebase to initialize...');

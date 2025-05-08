@@ -64,14 +64,14 @@ const writeToLogFile = (content: string): void => {
   if (logFilePath) {
     try {
       fs.appendFileSync(logFilePath, content);
-    } catch (e) {
+    } catch {
       // Silently fail - we don't want to cause issues with the main process
     }
   }
 };
 
 export const logger = {
-  info: (message: string, ...args: any[]) => {
+  info: (message: string, ...args: unknown[]): void => {
     const logMessage = `[INFO] ${message}\n`;
     process.stderr.write(logMessage);
 
@@ -82,13 +82,13 @@ export const logger = {
         if (args.length > 0) {
           writeToLogFile(`${JSON.stringify(args, null, 2)}\n`);
         }
-      } catch (e) {
+      } catch {
         // Silently fail
       }
     }
   },
 
-  error: (message: string, error?: any) => {
+  error: (message: string, error?: unknown): void => {
     const logMessage = `[ERROR] ${message}\n`;
     process.stderr.write(logMessage);
 
@@ -100,13 +100,13 @@ export const logger = {
           const errorStr = error instanceof Error ? error.stack : JSON.stringify(error, null, 2);
           writeToLogFile(`${errorStr}\n`);
         }
-      } catch (e) {
+      } catch {
         // Silently fail
       }
     }
   },
 
-  debug: (message: string, ...args: any[]) => {
+  debug: (message: string, ...args: unknown[]): void => {
     const logMessage = `[DEBUG] ${message}\n`;
     process.stderr.write(logMessage);
 
@@ -117,13 +117,13 @@ export const logger = {
         if (args.length > 0) {
           writeToLogFile(`${JSON.stringify(args, null, 2)}\n`);
         }
-      } catch (e) {
+      } catch {
         // Silently fail
       }
     }
   },
 
-  warn: (message: string, ...args: any[]) => {
+  warn: (message: string, ...args: unknown[]): void => {
     const logMessage = `[WARN] ${message}\n`;
     process.stderr.write(logMessage);
 
@@ -134,7 +134,7 @@ export const logger = {
         if (args.length > 0) {
           writeToLogFile(`${JSON.stringify(args, null, 2)}\n`);
         }
-      } catch (e) {
+      } catch {
         // Silently fail
       }
     }

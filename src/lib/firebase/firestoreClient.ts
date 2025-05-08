@@ -90,7 +90,7 @@ export async function list_collections(
  * @returns The same data object with Timestamps converted to ISO strings
  * @private
  */
-function convertTimestampsToISO(data: any) {
+function convertTimestampsToISO(data: Record<string, unknown>): Record<string, unknown> {
   for (const key in data) {
     if (data[key] instanceof Timestamp) {
       data[key] = data[key].toDate().toISOString();
@@ -123,7 +123,7 @@ function convertTimestampsToISO(data: any) {
  */
 export async function listDocuments(
   collection: string,
-  filters?: Array<{ field: string; operator: FirebaseFirestore.WhereFilterOp; value: any }>,
+  filters?: Array<{ field: string; operator: FirebaseFirestore.WhereFilterOp; value: unknown }>,
   limit: number = 20,
   pageToken?: string
 ): Promise<FirestoreResponse> {
@@ -405,7 +405,7 @@ export async function deleteDocument(collection: string, id: string): Promise<Fi
  */
 export async function queryCollectionGroup(
   collectionId: string,
-  filters?: Array<{ field: string; operator: FirebaseFirestore.WhereFilterOp; value: any }>,
+  filters?: Array<{ field: string; operator: FirebaseFirestore.WhereFilterOp; value: unknown }>,
   orderBy?: Array<{ field: string; direction?: 'asc' | 'desc' }>,
   limit: number = 20,
   pageToken?: string
@@ -413,7 +413,7 @@ export async function queryCollectionGroup(
   try {
     // Use any to bypass TypeScript type check for collectionGroup
     // The Firebase types are sometimes inconsistent between versions
-    let query: any = admin.firestore().collectionGroup(collectionId);
+    let query: FirebaseFirestore.Query = admin.firestore().collectionGroup(collectionId);
 
     // Apply filters if provided
     if (filters && filters.length > 0) {

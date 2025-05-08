@@ -9,7 +9,7 @@
 
 import express from 'express';
 import { randomUUID } from 'node:crypto';
-import { Server } from '@modelcontextprotocol/sdk/server/index.js';
+import type { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { isInitializeRequest } from '@modelcontextprotocol/sdk/types.js';
 import { logger } from '../utils/logger.js';
@@ -77,7 +77,10 @@ export async function initializeHttpTransport(server: Server, config: ServerConf
   });
 
   // Reusable handler for GET and DELETE requests
-  const handleSessionRequest = async (req: express.Request, res: express.Response) => {
+  const handleSessionRequest = async (
+    req: express.Request,
+    res: express.Response
+  ): Promise<void> => {
     const sessionId = req.headers['mcp-session-id'] as string | undefined;
     if (!sessionId || !transports[sessionId]) {
       logger.error(`Invalid or missing session ID: ${sessionId}`);
@@ -96,24 +99,24 @@ export async function initializeHttpTransport(server: Server, config: ServerConf
   app.delete(config.http.path, handleSessionRequest);
 
   // Start the HTTP server
-  const server_instance = app.listen(config.http.port, config.http.host, () => {
+  const serverInstance = app.listen(config.http.port, config.http.host, () => {
     logger.info(
       `HTTP transport listening on ${config.http.host}:${config.http.port}${config.http.path}`
     );
   });
 
   // Handle server errors (if the server instance has an 'on' method)
-  if (server_instance && typeof server_instance.on === 'function') {
-    server_instance.on('error', error => {
+  if (serverInstance && typeof serverInstance.on === 'function') {
+    serverInstance.on('error', error => {
       logger.error('HTTP server error', error);
     });
   }
 
   // Handle graceful shutdown
-  const sigintHandler = async () => {
+  const sigintHandler = async (): Promise<void> => {
     logger.info('Shutting down HTTP server');
-    if (server_instance && typeof server_instance.close === 'function') {
-      server_instance.close();
+    if (serverInstance && typeof serverInstance.close === 'function') {
+      serverInstance.close();
     }
   };
 
