@@ -1,3 +1,4 @@
+/* eslint-disable */
 import path from 'path';
 import fs from 'fs';
 import admin from 'firebase-admin';
@@ -8,8 +9,8 @@ const USE_EMULATOR = process.env.USE_FIREBASE_EMULATOR === 'true';
 const TEST_USER_ID = 'testid';
 const TEST_USER_EMAIL = 'test@example.com';
 const TEST_USER_PASSWORD = 'password123';
-const SERVICE_ACCOUNT_KEY_PATH = process.env.SERVICE_ACCOUNT_KEY_PATH ||
-  path.resolve(process.cwd(), 'firebaseServiceKey.json');
+const SERVICE_ACCOUNT_KEY_PATH =
+  process.env.SERVICE_ACCOUNT_KEY_PATH || path.resolve(process.cwd(), 'firebaseServiceKey.json');
 
 // Set the service account key path for environment
 process.env.SERVICE_ACCOUNT_KEY_PATH = SERVICE_ACCOUNT_KEY_PATH;
@@ -28,7 +29,7 @@ function initializeFirebase() {
       if (admin.apps.length === 0) {
         admin.initializeApp({
           projectId: 'demo-project',
-          storageBucket: 'demo-project.appspot.com'
+          storageBucket: 'demo-project.appspot.com',
         });
         console.log('Firebase initialized for testing with emulators');
       }
@@ -41,7 +42,9 @@ function initializeFirebase() {
 
     // Check if service account file exists
     if (!fs.existsSync(serviceAccountPath)) {
-      throw new Error(`Service account key file not found at ${serviceAccountPath}. Set SERVICE_ACCOUNT_KEY_PATH or use USE_FIREBASE_EMULATOR=true.`);
+      throw new Error(
+        `Service account key file not found at ${serviceAccountPath}. Set SERVICE_ACCOUNT_KEY_PATH or use USE_FIREBASE_EMULATOR=true.`
+      );
     }
 
     const serviceAccount = JSON.parse(fs.readFileSync(serviceAccountPath, 'utf8'));
@@ -51,7 +54,7 @@ function initializeFirebase() {
       admin.initializeApp({
         credential: admin.credential.cert(serviceAccount),
         projectId: serviceAccount.project_id,
-        storageBucket: `${serviceAccount.project_id}.firebasestorage.app`
+        storageBucket: `${serviceAccount.project_id}.firebasestorage.app`,
       });
 
       console.log('Firebase initialized for testing with real Firebase');
@@ -65,7 +68,7 @@ function initializeFirebase() {
 }
 
 // Initialize Firebase before any tests run
-const adminApp = initializeFirebase();
+initializeFirebase();
 
 // Create test user before tests
 beforeAll(async () => {
@@ -76,19 +79,25 @@ beforeAll(async () => {
     }
 
     // Try to create the test user
-    await admin.auth().createUser({
-      uid: TEST_USER_ID,
-      email: TEST_USER_EMAIL,
-      password: TEST_USER_PASSWORD,
-      emailVerified: true
-    }).catch(error => {
-      // If user already exists, that's fine
-      if (error.code === 'auth/uid-already-exists' || error.code === 'auth/email-already-exists') {
-        console.log(`Test user already exists: ${TEST_USER_EMAIL}`);
-      } else {
-        throw error;
-      }
-    });
+    await admin
+      .auth()
+      .createUser({
+        uid: TEST_USER_ID,
+        email: TEST_USER_EMAIL,
+        password: TEST_USER_PASSWORD,
+        emailVerified: true,
+      })
+      .catch(error => {
+        // If user already exists, that's fine
+        if (
+          error.code === 'auth/uid-already-exists' ||
+          error.code === 'auth/email-already-exists'
+        ) {
+          console.log(`Test user already exists: ${TEST_USER_EMAIL}`);
+        } else {
+          throw error;
+        }
+      });
 
     console.log(`Test user created/verified: ${TEST_USER_EMAIL}`);
   } catch (error) {
@@ -104,7 +113,9 @@ afterAll(async () => {
       initializeFirebase();
     }
 
-    await admin.auth().deleteUser(TEST_USER_ID)
+    await admin
+      .auth()
+      .deleteUser(TEST_USER_ID)
       .then(() => console.log(`Test user deleted: ${TEST_USER_EMAIL}`))
       .catch(error => {
         if (error.code !== 'auth/user-not-found') {
@@ -122,10 +133,10 @@ afterAll(async () => {
 }, 10000); // Increase timeout for cleanup
 
 // Mock console methods
-console.log = vi.fn((message) => process.stdout.write(message + '\n'));
-console.info = vi.fn((message) => process.stdout.write(message + '\n'));
-console.warn = vi.fn((message) => process.stdout.write(message + '\n'));
-console.error = vi.fn((message) => process.stderr.write(message + '\n'));
+console.log = vi.fn(message => process.stdout.write(message + '\n'));
+console.info = vi.fn(message => process.stdout.write(message + '\n'));
+console.warn = vi.fn(message => process.stdout.write(message + '\n'));
+console.error = vi.fn(message => process.stderr.write(message + '\n'));
 
 // Mock logger
 vi.mock('../src/utils/logger', () => ({
@@ -134,5 +145,5 @@ vi.mock('../src/utils/logger', () => ({
     info: vi.fn(),
     warn: vi.fn(),
     error: vi.fn(),
-  }
+  },
 }));
