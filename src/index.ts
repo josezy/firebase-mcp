@@ -1222,123 +1222,102 @@ class FirebaseMcpServer {
             try {
               logger.debug('Listing Firestore collections');
 
-              // Get collections but don't store or log the raw objects
-              const rawCollections = await admin.firestore().listCollections();
+              // Get document path parameter if provided
+              const documentPath = args.documentPath as string | undefined;
 
-              // Immediately extract only the properties we need into a new array
-              // This ensures no references to the original objects are maintained
-              const safeCollections = [];
-              for (const collection of rawCollections) {
-                // Create a completely new object with only string properties
-                safeCollections.push({
-                  id:
-                    typeof collection.id === 'string' ? collection.id : String(collection.id || ''),
-                  path:
-                    typeof collection.path === 'string'
-                      ? collection.path
-                      : String(collection.path || ''),
-                });
-              }
-
-              // Log the number of collections found
-              logger.debug(`Found ${safeCollections.length} collections`);
-
-              // Create a clean result object
-              const result = { collections: safeCollections };
-
-              try {
-                // Stringify the result to ensure it's valid JSON
-                const jsonString = JSON.stringify(result);
-
-                // Parse it back to ensure it's a clean object
-                const cleanResult = JSON.parse(jsonString);
-
-                // Create the response with the sanitized data
-                const response = {
-                  content: [
-                    {
-                      type: 'text',
-                      text: JSON.stringify(cleanResult),
-                    },
-                  ],
-                };
-
-                // Log only metadata about the response
-                logger.debug(`Returning ${safeCollections.length} collections in response`);
-
-                return response;
-              } catch (jsonError) {
-                // Handle JSON serialization errors
-                logger.error('Error serializing collections response:', jsonError);
-
-                // Create a minimal error response with no references to the original error
-                const fallbackResponse = {
-                  content: [
-                    {
-                      type: 'text',
-                      text: JSON.stringify({
-                        error: 'Failed to serialize collections response',
-                        message: jsonError instanceof Error ? jsonError.message : 'Unknown error',
-                      }),
-                    },
-                  ],
-                };
-
-                return fallbackResponse;
-              }
-            } catch (error) {
-              logger.error('Error listing Firestore collections:', error);
-
-              try {
-                // Create a clean error response with no references to the original error
-                const errorResponse = {
-                  content: [
-                    {
-                      type: 'text',
-                      text: JSON.stringify({
-                        error: 'Failed to list Firestore collections',
-                        message: error instanceof Error ? error.message : 'Unknown error',
-                      }),
-                    },
-                  ],
-                };
-
-                return errorResponse;
-              } catch (jsonError) {
-                // Last resort error response with minimal content
-                logger.error('Error creating error response:', jsonError);
-
+              // Make sure admin is properly initialized
+              if (!app) {
+                logger.error('Firebase app is not initialized');
                 return {
                   content: [
                     {
                       type: 'text',
                       text: JSON.stringify({
-                        error: 'Internal server error',
+                        error: 'Firebase initialization failed',
                       }),
                     },
                   ],
                 };
               }
+
+              // Import the standardized implementation from firestoreClient
+              const firestoreClient = await import('./lib/firebase/firestoreClient.js');
+
+              // Call the standardized implementation with the document path and admin instance
+              const result = await firestoreClient.list_collections(
+                documentPath,
+                undefined,
+                undefined,
+                admin
+              );
+
+              // Log the response for debugging
+              logger.debug(`Found collections in response`);
+
+              // Return the response directly
+              return {
+                content: [
+                  {
+                    type: 'text',
+                    text: result.content[0].text,
+                  },
+                ],
+              };
+            } catch (error) {
+              logger.error('Error listing Firestore collections:', error);
+
+              // Create a clean error response
+              return {
+                content: [
+                  {
+                    type: 'text',
+                    text: JSON.stringify({
+                      error: 'Failed to list Firestore collections',
+                      message: error instanceof Error ? error.message : 'Unknown error',
+                    }),
+                  },
+                ],
+              };
             }
           }
 
           case 'firestore_query_collection_group': {
-            const collectionId = args.collectionId as string;
-            const limit = Math.min(Math.max(1, (args.limit as number) || 20), 100); // Default 20, max 100
-
             try {
-              // Use the collectionGroup API directly here instead of importing
-              let query: FirebaseFirestore.Query = admin.firestore().collectionGroup(collectionId);
+              logger.debug('Querying Firestore collection group');
 
-              // Apply filters if provided
+              // Make sure admin is properly initialized
+              if (!app) {
+                logger.error('Firebase app is not initialized');
+                return {
+                  content: [
+                    {
+                      type: 'text',
+                      text: JSON.stringify({
+                        error: 'Firebase initialization failed',
+                      }),
+                    },
+                  ],
+                };
+              }
+
+              const collectionId = args.collectionId as string;
+              const limit = Math.min(Math.max(1, (args.limit as number) || 20), 100); // Default 20, max 100
               const filters = args.filters as
                 | Array<{
                     field: string;
-                    operator: admin.firestore.WhereFilterOp;
+                    operator: FirebaseFirestore.WhereFilterOp;
                     value: unknown;
                   }>
                 | undefined;
+              const orderBy = args.orderBy as
+                | Array<{ field: string; direction?: 'asc' | 'desc' }>
+                | undefined;
+              const pageToken = args.pageToken as string | undefined;
 
+              // Use the Firestore instance directly
+              let query: FirebaseFirestore.Query = admin.firestore().collectionGroup(collectionId);
+
+              // Apply filters if provided
               if (filters && filters.length > 0) {
                 filters.forEach(filter => {
                   let filterValue = filter.value;
@@ -1364,13 +1343,6 @@ class FirebaseMcpServer {
               }
 
               // Apply ordering if provided
-              const orderBy = args.orderBy as
-                | Array<{
-                    field: string;
-                    direction?: 'asc' | 'desc';
-                  }>
-                | undefined;
-
               if (orderBy && orderBy.length > 0) {
                 orderBy.forEach(order => {
                   query = query.orderBy(order.field, order.direction || 'asc');
@@ -1378,88 +1350,106 @@ class FirebaseMcpServer {
               }
 
               // Apply pagination if pageToken is provided
-              const pageToken = args.pageToken as string | undefined;
               if (pageToken) {
-                const lastDoc = await admin.firestore().doc(pageToken).get();
-                if (lastDoc.exists) {
-                  query = query.startAfter(lastDoc);
+                try {
+                  const lastDoc = await admin.firestore().doc(pageToken).get();
+                  if (lastDoc.exists) {
+                    query = query.startAfter(lastDoc);
+                  }
+                } catch (error) {
+                  logger.error('Invalid pagination token:', error);
+                  return {
+                    content: [
+                      {
+                        type: 'text',
+                        text: JSON.stringify({
+                          error: `Invalid pagination token: ${error instanceof Error ? error.message : 'Unknown error'}`,
+                        }),
+                      },
+                    ],
+                  };
                 }
               }
 
               // Apply limit
               query = query.limit(limit);
 
+              // Execute the query
               const snapshot = await query.get();
 
-              const documents = snapshot.docs.map(
-                (doc: FirebaseFirestore.QueryDocumentSnapshot) => {
-                  const rawData = doc.data();
-                  // Sanitize data to ensure it's JSON-serializable
-                  const data = Object.entries(rawData).reduce(
-                    (acc, [key, value]) => {
-                      // Handle basic types directly
-                      if (
-                        typeof value === 'string' ||
-                        typeof value === 'number' ||
-                        typeof value === 'boolean' ||
-                        value === null
-                      ) {
-                        acc[key] = value;
-                      }
-                      // Convert Date objects to ISO strings
-                      else if (value instanceof Date) {
-                        acc[key] = value.toISOString();
-                      }
-                      // Handle Firestore Timestamp objects properly
-                      else if (value instanceof Timestamp) {
-                        acc[key] = value.toDate().toISOString();
-                      }
-                      // Convert arrays to strings
-                      else if (Array.isArray(value)) {
-                        acc[key] = `[${value.join(', ')}]`;
-                      }
-                      // Convert other objects to string representation
-                      else if (typeof value === 'object') {
-                        acc[key] = '[Object]';
-                      }
-                      // Convert other types to strings
-                      else {
-                        acc[key] = String(value);
-                      }
-                      return acc;
-                    },
-                    {} as Record<string, unknown>
-                  );
+              // Process the results
+              const documents = snapshot.docs.map(doc => {
+                // For collection groups, we need to use the full path for the URL
+                const fullPath = doc.ref.path;
 
-                  return {
-                    id: doc.id,
-                    path: doc.ref.path,
-                    data,
-                  };
-                }
-              );
+                // Handle Timestamp and other Firestore types
+                const data = Object.entries(doc.data()).reduce(
+                  (acc, [key, value]) => {
+                    // Handle basic types directly
+                    if (
+                      typeof value === 'string' ||
+                      typeof value === 'number' ||
+                      typeof value === 'boolean' ||
+                      value === null
+                    ) {
+                      acc[key] = value;
+                    }
+                    // Convert Date objects to ISO strings
+                    else if (value instanceof Date) {
+                      acc[key] = value.toISOString();
+                    }
+                    // Handle Firestore Timestamp objects properly
+                    else if (value instanceof Timestamp) {
+                      acc[key] = value.toDate().toISOString();
+                    }
+                    // Convert arrays to strings
+                    else if (Array.isArray(value)) {
+                      acc[key] = value;
+                    }
+                    // Convert other objects to string representation
+                    else if (typeof value === 'object') {
+                      acc[key] = '[Object]';
+                    }
+                    // Convert other types to strings
+                    else {
+                      acc[key] = String(value);
+                    }
+                    return acc;
+                  },
+                  {} as Record<string, unknown>
+                );
+
+                return {
+                  id: doc.id,
+                  path: fullPath,
+                  data,
+                };
+              });
 
               // Get the last document for pagination
               const lastVisible = snapshot.docs[snapshot.docs.length - 1];
               const nextPageToken = lastVisible ? lastVisible.ref.path : null;
 
-              // Ensure clean JSON by parsing and re-stringifying
-              const sanitizedJson = JSON.stringify({
+              // Create the result object
+              const result = {
                 documents,
                 nextPageToken,
-              });
+              };
 
               // Log the response for debugging
-              const response = {
+              logger.debug(
+                `Found ${documents.length} documents in collection group ${collectionId}`
+              );
+
+              // Ensure we're returning a properly formatted response
+              return {
                 content: [
                   {
                     type: 'text',
-                    text: sanitizedJson,
+                    text: JSON.stringify(result),
                   },
                 ],
               };
-              logger.debug('firestore_query_collection_group response:', JSON.stringify(response));
-              return response;
             } catch (error) {
               logger.error('Error in collection group query:', error);
 
