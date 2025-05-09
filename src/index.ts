@@ -1221,13 +1221,22 @@ class FirebaseMcpServer {
           case 'firestore_list_collections': {
             try {
               logger.debug('Listing Firestore collections');
+
+              // Get collections but don't log the raw objects
               const collections = await admin.firestore().listCollections();
 
-              // Create a simple array of collection objects with only primitive types
-              const collectionList = collections.map(collection => ({
-                id: String(collection.id),
-                path: String(collection.path),
-              }));
+              // Create a simple array of collection objects with ONLY primitive types
+              // Explicitly convert all properties to strings to avoid serialization issues
+              const collectionList = collections.map(collection => {
+                // Only extract the specific properties we need and convert to strings
+                return {
+                  id: String(collection.id || ''),
+                  path: String(collection.path || ''),
+                };
+              });
+
+              // Log the sanitized collection list for debugging
+              logger.debug(`Found ${collectionList.length} collections`);
 
               // Create a proper object structure
               const result = { collections: collectionList };
@@ -1236,7 +1245,7 @@ class FirebaseMcpServer {
                 // Ensure clean JSON by parsing and re-stringifying
                 const sanitizedJson = JSON.stringify(result);
 
-                // Log the response for debugging
+                // Create the response object
                 const response = {
                   content: [
                     {
@@ -1245,14 +1254,22 @@ class FirebaseMcpServer {
                     },
                   ],
                 };
+
+                // Log only the structure of the response, not the full content
                 logger.debug(
-                  'firestore_list_collections success response:',
-                  JSON.stringify(response)
+                  'firestore_list_collections success response structure:',
+                  JSON.stringify({
+                    contentTypes: response.content.map(item => item.type),
+                    hasCollections: Boolean(collectionList.length),
+                    collectionCount: collectionList.length,
+                  })
                 );
+
                 return response;
               } catch (jsonError) {
                 // Handle JSON serialization errors
                 logger.error('Error serializing collections response:', jsonError);
+
                 const fallbackResponse = {
                   content: [
                     {
@@ -1264,10 +1281,15 @@ class FirebaseMcpServer {
                     },
                   ],
                 };
+
                 logger.debug(
-                  'firestore_list_collections fallback response:',
-                  JSON.stringify(fallbackResponse)
+                  'firestore_list_collections fallback response structure:',
+                  JSON.stringify({
+                    contentTypes: fallbackResponse.content.map(item => item.type),
+                    isError: true,
+                  })
                 );
+
                 return fallbackResponse;
               }
             } catch (error) {
@@ -1280,7 +1302,7 @@ class FirebaseMcpServer {
                   details: error instanceof Error ? error.message : 'Unknown error',
                 });
 
-                // Log the response for debugging
+                // Create the error response
                 const response = {
                   content: [
                     {
@@ -1289,14 +1311,21 @@ class FirebaseMcpServer {
                     },
                   ],
                 };
+
+                // Log only the structure of the error response
                 logger.debug(
-                  'firestore_list_collections error response:',
-                  JSON.stringify(response)
+                  'firestore_list_collections error response structure:',
+                  JSON.stringify({
+                    contentTypes: response.content.map(item => item.type),
+                    isError: true,
+                  })
                 );
+
                 return response;
               } catch (jsonError) {
                 // Handle JSON serialization errors in the error response
                 logger.error('Error serializing error response:', jsonError);
+
                 return {
                   content: [
                     {

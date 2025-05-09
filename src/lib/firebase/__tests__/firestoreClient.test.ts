@@ -790,7 +790,7 @@ describe('Firestore Client', () => {
 
         // Verify response
         expect(result.isError).toBeUndefined();
-        expect(result.content[0].type).toBe('json');
+        expect(result.content[0].type).toBe('text');
 
         // Parse the response
         const responseData = JSON.parse(result.content[0].text);
