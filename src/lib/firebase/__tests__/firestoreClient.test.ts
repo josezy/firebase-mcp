@@ -95,7 +95,9 @@ describe('Firestore Client', () => {
 
       // Verify error response
       expect(result.isError).toBe(true);
-      expect(result.content[0].text).toBe('Document not found: non-existent-doc');
+      expect(result.content[0].text).toBe(
+        JSON.stringify({ error: 'Document not found: non-existent-doc' })
+      );
     });
 
     // Test error handling when getProjectId returns null
@@ -115,7 +117,9 @@ describe('Firestore Client', () => {
 
         // Verify error response
         expect(result.isError).toBe(true);
-        expect(result.content[0].text).toBe('Could not determine project ID');
+        expect(result.content[0].text).toBe(
+          JSON.stringify({ error: 'Could not determine project ID' })
+        );
       } finally {
         // Restore service account path
         process.env.SERVICE_ACCOUNT_KEY_PATH = originalPath;
@@ -136,7 +140,9 @@ describe('Firestore Client', () => {
 
         // Verify error response
         expect(result.isError).toBe(true);
-        expect(result.content[0].text).toBe('Service account path not set');
+        expect(result.content[0].text).toBe(
+          JSON.stringify({ error: 'Service account path not set' })
+        );
       } finally {
         // Restore the original service account path
         process.env.SERVICE_ACCOUNT_KEY_PATH = originalPath;
@@ -179,7 +185,7 @@ describe('Firestore Client', () => {
 
       // Verify error response
       expect(result.isError).toBe(true);
-      expect(result.content[0].text).toBe('Firebase not initialized');
+      expect(result.content[0].text).toBe(JSON.stringify({ error: 'Firebase not initialized' }));
 
       // Restore the original implementation
       vi.restoreAllMocks();
@@ -233,7 +239,9 @@ describe('Firestore Client', () => {
 
         // Verify error response
         expect(result.isError).toBe(true);
-        expect(result.content[0].text).toBe('Service account path not set');
+        expect(result.content[0].text).toBe(
+          JSON.stringify({ error: 'Service account path not set' })
+        );
       } finally {
         // Restore the original service account path
         process.env.SERVICE_ACCOUNT_KEY_PATH = originalPath;
@@ -263,7 +271,9 @@ describe('Firestore Client', () => {
 
         // Verify error response
         expect(result.isError).toBe(true);
-        expect(result.content[0].text).toBe('Could not determine project ID');
+        expect(result.content[0].text).toBe(
+          JSON.stringify({ error: 'Could not determine project ID' })
+        );
       } finally {
         // Restore service account path
         process.env.SERVICE_ACCOUNT_KEY_PATH = originalPath;
@@ -303,7 +313,7 @@ describe('Firestore Client', () => {
 
       // Verify error response
       expect(result.isError).toBe(true);
-      expect(result.content[0].text).toBe('Firebase not initialized');
+      expect(result.content[0].text).toBe(JSON.stringify({ error: 'Firebase not initialized' }));
 
       // Restore the original implementation
       vi.restoreAllMocks();
@@ -365,7 +375,9 @@ describe('Firestore Client', () => {
 
         // The update succeeds but then fails when trying to get the project ID for the console URL
         expect(result.isError).toBe(true);
-        expect(result.content[0].text).toBe('Service account path not set');
+        expect(result.content[0].text).toBe(
+          JSON.stringify({ error: 'Service account path not set' })
+        );
       } finally {
         // Restore the original service account path
         process.env.SERVICE_ACCOUNT_KEY_PATH = originalPath;
@@ -395,7 +407,9 @@ describe('Firestore Client', () => {
 
         // Verify error response
         expect(result.isError).toBe(true);
-        expect(result.content[0].text).toBe('Could not determine project ID');
+        expect(result.content[0].text).toBe(
+          JSON.stringify({ error: 'Could not determine project ID' })
+        );
       } finally {
         // Restore service account path
         process.env.SERVICE_ACCOUNT_KEY_PATH = originalPath;
@@ -438,7 +452,7 @@ describe('Firestore Client', () => {
 
       // Verify error response
       expect(result.isError).toBe(true);
-      expect(result.content[0].text).toBe('Firebase not initialized');
+      expect(result.content[0].text).toBe(JSON.stringify({ error: 'Firebase not initialized' }));
 
       // Restore the original implementation
       vi.restoreAllMocks();
@@ -466,7 +480,9 @@ describe('Firestore Client', () => {
       // Verify the document was actually deleted
       const deletedDoc = await getDocument(testCollection, tempDocId);
       expect(deletedDoc.isError).toBe(true);
-      expect(deletedDoc.content[0].text).toBe('Document not found: ' + tempDocId);
+      expect(deletedDoc.content[0].text).toBe(
+        JSON.stringify({ error: 'Document not found: ' + tempDocId })
+      );
     });
 
     it('should report firestore errors when service account path is not set', async () => {
@@ -490,7 +506,7 @@ describe('Firestore Client', () => {
 
       // For non-existent documents, expect the "no entity to delete" message
       expect(result).toHaveProperty('content');
-      expect(result.content[0].text).toBe('no entity to delete');
+      expect(result.content[0].text).toBe(JSON.stringify({ error: 'no entity to delete' }));
       expect(result.isError).toBe(true);
     });
 
@@ -515,7 +531,7 @@ describe('Firestore Client', () => {
 
       // Verify error response
       expect(result.isError).toBe(true);
-      expect(result.content[0].text).toBe(mockError.message);
+      expect(result.content[0].text).toBe(JSON.stringify({ error: mockError.message }));
     });
 
     // Test for error handling in deleteDocument when Firebase is not initialized (line 376)
@@ -530,7 +546,7 @@ describe('Firestore Client', () => {
 
       // Verify error response
       expect(result.isError).toBe(true);
-      expect(result.content[0].text).toBe('Firebase not initialized');
+      expect(result.content[0].text).toBe(JSON.stringify({ error: 'Firebase not initialized' }));
 
       // Restore the original implementation
       vi.restoreAllMocks();
@@ -598,7 +614,7 @@ describe('Firestore Client', () => {
 
         // Verify error response
         expect(result.isError).toBe(true);
-        expect(result.content[0].text).toBe('Firebase not initialized');
+        expect(result.content[0].text).toBe(JSON.stringify({ error: 'Firebase not initialized' }));
       } finally {
         // Restore the original implementation
         firestoreSpy.mockRestore();
@@ -619,7 +635,9 @@ describe('Firestore Client', () => {
 
         // Verify error response
         expect(result.isError).toBe(true);
-        expect(result.content[0].text).toBe('Service account path not set');
+        expect(result.content[0].text).toBe(
+          JSON.stringify({ error: 'Service account path not set' })
+        );
       } finally {
         // Restore the original service account path
         process.env.SERVICE_ACCOUNT_KEY_PATH = originalPath;
@@ -643,7 +661,9 @@ describe('Firestore Client', () => {
 
         // Verify error response
         expect(result.isError).toBe(true);
-        expect(result.content[0].text).toBe('Could not determine project ID');
+        expect(result.content[0].text).toBe(
+          JSON.stringify({ error: 'Could not determine project ID' })
+        );
       } finally {
         // Restore service account path
         process.env.SERVICE_ACCOUNT_KEY_PATH = originalPath;
@@ -707,7 +727,7 @@ describe('Firestore Client', () => {
       // Invalid document path will result in an error
       expect(result.isError).toBe(true);
       expect(result.content).toBeDefined();
-      expect(result.content[0].type).toBe('error');
+      expect(result.content[0].type).toBe('text');
     });
 
     // Test for error handling in listDocuments when Firestore query fails (lines 77-82)
@@ -847,7 +867,9 @@ describe('Firestore Client', () => {
 
         // Verify error response
         expect(result.isError).toBe(true);
-        expect(result.content[0].text).toBe('Could not determine project ID');
+        expect(result.content[0].text).toBe(
+          JSON.stringify({ error: 'Could not determine project ID' })
+        );
       } finally {
         // Restore service account path
         process.env.SERVICE_ACCOUNT_KEY_PATH = originalPath;
@@ -868,7 +890,9 @@ describe('Firestore Client', () => {
 
         // Verify error response
         expect(result.isError).toBe(true);
-        expect(result.content[0].text).toBe('Service account path not set');
+        expect(result.content[0].text).toBe(
+          JSON.stringify({ error: 'Service account path not set' })
+        );
       } finally {
         // Restore the original service account path
         process.env.SERVICE_ACCOUNT_KEY_PATH = originalPath;
@@ -968,7 +992,7 @@ describe('Firestore Client', () => {
 
       // Verify error response
       expect(result.isError).toBe(true);
-      expect(result.content[0].text).toBe('Firebase not initialized');
+      expect(result.content[0].text).toBe(JSON.stringify({ error: 'Firebase not initialized' }));
 
       // Restore the original implementation
       vi.restoreAllMocks();
@@ -1235,7 +1259,9 @@ describe('Firestore Client', () => {
 
         // Verify error response
         expect(result.isError).toBe(true);
-        expect(result.content[0].text).toBe('Service account path not set');
+        expect(result.content[0].text).toBe(
+          JSON.stringify({ error: 'Service account path not set' })
+        );
       } finally {
         // Restore the original service account path
         process.env.SERVICE_ACCOUNT_KEY_PATH = originalPath;
@@ -1259,7 +1285,9 @@ describe('Firestore Client', () => {
 
         // Verify error response
         expect(result.isError).toBe(true);
-        expect(result.content[0].text).toBe('Could not determine project ID');
+        expect(result.content[0].text).toBe(
+          JSON.stringify({ error: 'Could not determine project ID' })
+        );
       } finally {
         // Restore service account path
         process.env.SERVICE_ACCOUNT_KEY_PATH = originalPath;
