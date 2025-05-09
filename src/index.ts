@@ -1218,27 +1218,57 @@ class FirebaseMcpServer {
             }
           }
 
-          case 'firestore_list_collections':
-            const collections = await admin.firestore().listCollections();
-            const collectionList = collections.map(collection => ({
-              id: collection.id,
-              path: collection.path,
-            }));
+          case 'firestore_list_collections': {
+            try {
+              logger.debug('Listing Firestore collections');
+              const collections = await admin.firestore().listCollections();
+              const collectionList = collections.map(collection => ({
+                id: collection.id,
+                path: collection.path,
+              }));
 
-            // Ensure clean JSON by parsing and re-stringifying
-            const sanitizedJson = JSON.stringify({ collections: collectionList });
+              // Create a proper object structure
+              const result = { collections: collectionList };
 
-            // Log the response for debugging
-            const response = {
-              content: [
-                {
-                  type: 'text',
-                  text: sanitizedJson,
-                },
-              ],
-            };
-            logger.debug('firestore_list_collections response:', JSON.stringify(response));
-            return response;
+              // Ensure clean JSON by parsing and re-stringifying
+              const sanitizedJson = JSON.stringify(result);
+
+              // Log the response for debugging
+              const response = {
+                content: [
+                  {
+                    type: 'text',
+                    text: sanitizedJson,
+                  },
+                ],
+              };
+              logger.debug(
+                'firestore_list_collections success response:',
+                JSON.stringify(response)
+              );
+              return response;
+            } catch (error) {
+              logger.error('Error listing Firestore collections:', error);
+
+              // Ensure clean JSON by parsing and re-stringifying
+              const sanitizedJson = JSON.stringify({
+                error: 'Failed to list Firestore collections',
+                details: error instanceof Error ? error.message : 'Unknown error',
+              });
+
+              // Log the response for debugging
+              const response = {
+                content: [
+                  {
+                    type: 'text',
+                    text: sanitizedJson,
+                  },
+                ],
+              };
+              logger.debug('firestore_list_collections error response:', JSON.stringify(response));
+              return response;
+            }
+          }
 
           case 'firestore_query_collection_group': {
             const collectionId = args.collectionId as string;
