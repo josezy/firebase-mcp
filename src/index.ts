@@ -1222,73 +1222,67 @@ class FirebaseMcpServer {
             try {
               logger.debug('Listing Firestore collections');
 
-              // Get collections but don't log the raw objects
-              const collections = await admin.firestore().listCollections();
+              // Get collections but don't store or log the raw objects
+              const rawCollections = await admin.firestore().listCollections();
 
-              // Create a simple array of collection objects with ONLY primitive types
-              // Explicitly convert all properties to strings to avoid serialization issues
-              const collectionList = collections.map(collection => {
-                // Only extract the specific properties we need and convert to strings
-                return {
-                  id: String(collection.id || ''),
-                  path: String(collection.path || ''),
-                };
-              });
+              // Immediately extract only the properties we need into a new array
+              // This ensures no references to the original objects are maintained
+              const safeCollections = [];
+              for (const collection of rawCollections) {
+                // Create a completely new object with only string properties
+                safeCollections.push({
+                  id:
+                    typeof collection.id === 'string' ? collection.id : String(collection.id || ''),
+                  path:
+                    typeof collection.path === 'string'
+                      ? collection.path
+                      : String(collection.path || ''),
+                });
+              }
 
-              // Log the sanitized collection list for debugging
-              logger.debug(`Found ${collectionList.length} collections`);
+              // Log the number of collections found
+              logger.debug(`Found ${safeCollections.length} collections`);
 
-              // Create a proper object structure
-              const result = { collections: collectionList };
+              // Create a clean result object
+              const result = { collections: safeCollections };
 
               try {
-                // Ensure clean JSON by parsing and re-stringifying
-                const sanitizedJson = JSON.stringify(result);
+                // Stringify the result to ensure it's valid JSON
+                const jsonString = JSON.stringify(result);
 
-                // Create the response object
+                // Parse it back to ensure it's a clean object
+                const cleanResult = JSON.parse(jsonString);
+
+                // Create the response with the sanitized data
                 const response = {
                   content: [
                     {
-                      type: 'text', // Always use 'text', not 'json'
-                      text: sanitizedJson,
+                      type: 'text',
+                      text: JSON.stringify(cleanResult),
                     },
                   ],
                 };
 
-                // Log only the structure of the response, not the full content
-                logger.debug(
-                  'firestore_list_collections success response structure:',
-                  JSON.stringify({
-                    contentTypes: response.content.map(item => item.type),
-                    hasCollections: Boolean(collectionList.length),
-                    collectionCount: collectionList.length,
-                  })
-                );
+                // Log only metadata about the response
+                logger.debug(`Returning ${safeCollections.length} collections in response`);
 
                 return response;
               } catch (jsonError) {
                 // Handle JSON serialization errors
                 logger.error('Error serializing collections response:', jsonError);
 
+                // Create a minimal error response with no references to the original error
                 const fallbackResponse = {
                   content: [
                     {
                       type: 'text',
                       text: JSON.stringify({
                         error: 'Failed to serialize collections response',
-                        details: jsonError instanceof Error ? jsonError.message : 'Unknown error',
+                        message: jsonError instanceof Error ? jsonError.message : 'Unknown error',
                       }),
                     },
                   ],
                 };
-
-                logger.debug(
-                  'firestore_list_collections fallback response structure:',
-                  JSON.stringify({
-                    contentTypes: fallbackResponse.content.map(item => item.type),
-                    isError: true,
-                  })
-                );
 
                 return fallbackResponse;
               }
@@ -1296,35 +1290,23 @@ class FirebaseMcpServer {
               logger.error('Error listing Firestore collections:', error);
 
               try {
-                // Ensure clean JSON by parsing and re-stringifying
-                const sanitizedJson = JSON.stringify({
-                  error: 'Failed to list Firestore collections',
-                  details: error instanceof Error ? error.message : 'Unknown error',
-                });
-
-                // Create the error response
-                const response = {
+                // Create a clean error response with no references to the original error
+                const errorResponse = {
                   content: [
                     {
-                      type: 'text', // Always use 'text', not 'json'
-                      text: sanitizedJson,
+                      type: 'text',
+                      text: JSON.stringify({
+                        error: 'Failed to list Firestore collections',
+                        message: error instanceof Error ? error.message : 'Unknown error',
+                      }),
                     },
                   ],
                 };
 
-                // Log only the structure of the error response
-                logger.debug(
-                  'firestore_list_collections error response structure:',
-                  JSON.stringify({
-                    contentTypes: response.content.map(item => item.type),
-                    isError: true,
-                  })
-                );
-
-                return response;
+                return errorResponse;
               } catch (jsonError) {
-                // Handle JSON serialization errors in the error response
-                logger.error('Error serializing error response:', jsonError);
+                // Last resort error response with minimal content
+                logger.error('Error creating error response:', jsonError);
 
                 return {
                   content: [
