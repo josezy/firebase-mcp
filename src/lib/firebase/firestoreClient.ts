@@ -67,11 +67,7 @@ export async function list_collections(
       };
     }
 
-    // Get collections but don't store or log the raw objects
-    const collections = documentPath
-      ? await firestore.doc(documentPath).listCollections()
-      : await firestore.listCollections();
-
+    // Get the service account path for project ID
     const serviceAccountPath = process.env.SERVICE_ACCOUNT_KEY_PATH;
     if (!serviceAccountPath) {
       return {
@@ -92,31 +88,57 @@ export async function list_collections(
       };
     }
 
-    // Immediately extract only the properties we need into a new array
-    // This ensures no references to the original objects are maintained
-    const safeCollections = [];
-    for (const collection of collections) {
-      // Create a completely new object with only string properties
-      const collectionUrl = `https://console.firebase.google.com/project/${projectId}/firestore/data/${documentPath || ''}${documentPath ? '/' : ''}${collection.id}`;
-      safeCollections.push({
-        id: typeof collection.id === 'string' ? collection.id : String(collection.id || ''),
-        path: typeof collection.path === 'string' ? collection.path : String(collection.path || ''),
-        url: collectionUrl,
-      });
+    // Create a safe array to hold collection information
+    const safeCollections: Array<{ id: string; path: string; url: string }> = [];
+
+    try {
+      // Get collections using the Firestore API
+      const collectionsRef = documentPath
+        ? await firestore.doc(documentPath).listCollections()
+        : await firestore.listCollections();
+
+      // Important: Convert the collection references to a simple array of objects
+      // This avoids any issues with circular references or non-serializable properties
+      for (const collection of collectionsRef) {
+        // Extract only the string properties we need
+        const id = String(collection.id || '');
+        const path = String(collection.path || '');
+        const collectionUrl = `https://console.firebase.google.com/project/${projectId}/firestore/data/${documentPath || ''}${documentPath ? '/' : ''}${id}`;
+
+        // Add to our safe array
+        safeCollections.push({
+          id: id,
+          path: path,
+          url: collectionUrl,
+        });
+      }
+    } catch (collectionError) {
+      // Log the error but continue with an empty array
+      return {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify({
+              error: 'Error listing collections',
+              message: collectionError instanceof Error ? collectionError.message : 'Unknown error',
+              collections: [],
+            }),
+          },
+        ],
+        isError: true,
+      };
     }
 
-    // Create a clean result object
-    const result = { collections: safeCollections };
+    // Create a result object with our safe collections
+    const result = {
+      collections: safeCollections,
+      path: documentPath || 'root',
+      projectId: projectId,
+    };
 
-    // Stringify the result to ensure it's valid JSON
-    const jsonString = JSON.stringify(result);
-
-    // Parse it back to ensure it's a clean object
-    const cleanResult = JSON.parse(jsonString);
-
-    // Always use 'text' type for content to ensure proper handling by MCP clients
+    // Return a clean JSON response
     return {
-      content: [{ type: 'text', text: JSON.stringify(cleanResult) }],
+      content: [{ type: 'text', text: JSON.stringify(result) }],
     };
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
