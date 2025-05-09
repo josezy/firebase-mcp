@@ -71,7 +71,7 @@ export async function list_collections(
     });
 
     return {
-      content: [{ type: 'json', text: JSON.stringify({ collections: collectionList }) }],
+      content: [{ type: 'text', text: JSON.stringify({ collections: collectionList }) }],
     };
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -177,7 +177,7 @@ export async function listDocuments(
     const nextPageToken = lastVisible ? lastVisible.ref.path : undefined;
 
     return {
-      content: [{ type: 'json', text: JSON.stringify({ documents, nextPageToken }) }],
+      content: [{ type: 'text', text: JSON.stringify({ documents, nextPageToken }) }],
     };
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -226,7 +226,7 @@ export async function addDocument(collection: string, data: object): Promise<Fir
     const consoleUrl = `https://console.firebase.google.com/project/${projectId}/firestore/data/${collection}/${docRef.id}`;
 
     return {
-      content: [{ type: 'json', text: JSON.stringify({ id: docRef.id, url: consoleUrl }) }],
+      content: [{ type: 'text', text: JSON.stringify({ id: docRef.id, url: consoleUrl }) }],
     };
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -279,7 +279,7 @@ export async function getDocument(collection: string, id: string): Promise<Fires
 
     return {
       content: [
-        { type: 'json', text: JSON.stringify({ id: doc.id, data: doc.data(), url: consoleUrl }) },
+        { type: 'text', text: JSON.stringify({ id: doc.id, data: doc.data(), url: consoleUrl }) },
       ],
     };
   } catch (error) {
@@ -333,7 +333,7 @@ export async function updateDocument(
     const consoleUrl = `https://console.firebase.google.com/project/${projectId}/firestore/data/${collection}/${id}`;
 
     return {
-      content: [{ type: 'json', text: JSON.stringify({ success: true, url: consoleUrl }) }],
+      content: [{ type: 'text', text: JSON.stringify({ success: true, url: consoleUrl }) }],
     };
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -370,7 +370,7 @@ export async function deleteDocument(collection: string, id: string): Promise<Fi
 
     await docRef.delete();
     return {
-      content: [{ type: 'json', text: JSON.stringify({ success: true }) }],
+      content: [{ type: 'text', text: JSON.stringify({ success: true }) }],
     };
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -494,7 +494,7 @@ export async function queryCollectionGroup(
     const jsonText = JSON.stringify(responseObj);
 
     return {
-      content: [{ type: 'json', text: jsonText }],
+      content: [{ type: 'text', text: jsonText }],
     };
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
