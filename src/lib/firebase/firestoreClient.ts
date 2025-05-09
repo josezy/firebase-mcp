@@ -38,17 +38,46 @@ interface FirestoreResponse {
 export async function list_collections(
   documentPath?: string,
   _limit: number = 20,
-  _pageToken?: string
+  _pageToken?: string,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  adminInstance?: any
 ): Promise<FirestoreResponse> {
   try {
+    // Use the passed admin instance if available, otherwise use the imported one
+    const adminToUse = adminInstance || admin;
+
+    // Check if Firebase admin is properly initialized
+    if (!adminToUse || typeof adminToUse.firestore !== 'function') {
+      return {
+        content: [
+          { type: 'text', text: JSON.stringify({ error: 'Firebase is not properly initialized' }) },
+        ],
+        isError: true,
+      };
+    }
+
+    // Get the Firestore instance
+    const firestore = adminToUse.firestore();
+    if (!firestore) {
+      return {
+        content: [
+          { type: 'text', text: JSON.stringify({ error: 'Firestore instance not available' }) },
+        ],
+        isError: true,
+      };
+    }
+
+    // Get collections but don't store or log the raw objects
     const collections = documentPath
-      ? await admin.firestore().doc(documentPath).listCollections()
-      : await admin.firestore().listCollections();
+      ? await firestore.doc(documentPath).listCollections()
+      : await firestore.listCollections();
 
     const serviceAccountPath = process.env.SERVICE_ACCOUNT_KEY_PATH;
     if (!serviceAccountPath) {
       return {
-        content: [{ type: 'error', text: 'Service account path not set' }],
+        content: [
+          { type: 'text', text: JSON.stringify({ error: 'Service account path not set' }) },
+        ],
         isError: true,
       };
     }
@@ -56,27 +85,44 @@ export async function list_collections(
     const projectId = getProjectId(serviceAccountPath);
     if (!projectId) {
       return {
-        content: [{ type: 'error', text: 'Could not determine project ID' }],
+        content: [
+          { type: 'text', text: JSON.stringify({ error: 'Could not determine project ID' }) },
+        ],
         isError: true,
       };
     }
 
-    const collectionList = collections.map(collection => {
-      const collectionUrl = `https://console.firebase.google.com/project/${projectId}/firestore/data/${documentPath}/${collection.id}`;
-      return {
-        id: collection.id,
-        path: collection.path,
+    // Immediately extract only the properties we need into a new array
+    // This ensures no references to the original objects are maintained
+    const safeCollections = [];
+    for (const collection of collections) {
+      // Create a completely new object with only string properties
+      const collectionUrl = `https://console.firebase.google.com/project/${projectId}/firestore/data/${documentPath || ''}${documentPath ? '/' : ''}${collection.id}`;
+      safeCollections.push({
+        id: typeof collection.id === 'string' ? collection.id : String(collection.id || ''),
+        path: typeof collection.path === 'string' ? collection.path : String(collection.path || ''),
         url: collectionUrl,
-      };
-    });
+      });
+    }
 
+    // Create a clean result object
+    const result = { collections: safeCollections };
+
+    // Stringify the result to ensure it's valid JSON
+    const jsonString = JSON.stringify(result);
+
+    // Parse it back to ensure it's a clean object
+    const cleanResult = JSON.parse(jsonString);
+
+    // Always use 'text' type for content to ensure proper handling by MCP clients
     return {
-      content: [{ type: 'text', text: JSON.stringify({ collections: collectionList }) }],
+      content: [{ type: 'text', text: JSON.stringify(cleanResult) }],
     };
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    // Always use 'text' type for error responses too
     return {
-      content: [{ type: 'error', text: errorMessage }],
+      content: [{ type: 'text', text: JSON.stringify({ error: errorMessage }) }],
       isError: true,
     };
   }
@@ -128,7 +174,28 @@ export async function listDocuments(
   pageToken?: string
 ): Promise<FirestoreResponse> {
   try {
-    let query: FirebaseFirestore.Query = admin.firestore().collection(collection);
+    // Check if Firebase admin is properly initialized
+    if (!admin || typeof admin.firestore !== 'function') {
+      return {
+        content: [
+          { type: 'text', text: JSON.stringify({ error: 'Firebase is not properly initialized' }) },
+        ],
+        isError: true,
+      };
+    }
+
+    // Get the Firestore instance
+    const firestore = admin.firestore();
+    if (!firestore) {
+      return {
+        content: [
+          { type: 'text', text: JSON.stringify({ error: 'Firestore instance not available' }) },
+        ],
+        isError: true,
+      };
+    }
+
+    let query: FirebaseFirestore.Query = firestore.collection(collection);
 
     if (filters) {
       filters.forEach(filter => {
@@ -141,7 +208,7 @@ export async function listDocuments(
     }
 
     if (pageToken) {
-      const lastDoc = await admin.firestore().doc(pageToken).get();
+      const lastDoc = await firestore.doc(pageToken).get();
       if (lastDoc.exists) {
         query = query.startAfter(lastDoc);
       }
@@ -151,7 +218,9 @@ export async function listDocuments(
     const serviceAccountPath = process.env.SERVICE_ACCOUNT_KEY_PATH;
     if (!serviceAccountPath) {
       return {
-        content: [{ type: 'error', text: 'Service account path not set' }],
+        content: [
+          { type: 'text', text: JSON.stringify({ error: 'Service account path not set' }) },
+        ],
         isError: true,
       };
     }
@@ -159,7 +228,9 @@ export async function listDocuments(
     const projectId = getProjectId(serviceAccountPath);
     if (!projectId) {
       return {
-        content: [{ type: 'error', text: 'Could not determine project ID' }],
+        content: [
+          { type: 'text', text: JSON.stringify({ error: 'Could not determine project ID' }) },
+        ],
         isError: true,
       };
     }
@@ -182,7 +253,7 @@ export async function listDocuments(
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     return {
-      content: [{ type: 'error', text: errorMessage }],
+      content: [{ type: 'text', text: JSON.stringify({ error: errorMessage }) }],
       isError: true,
     };
   }
@@ -206,11 +277,34 @@ export async function listDocuments(
  */
 export async function addDocument(collection: string, data: object): Promise<FirestoreResponse> {
   try {
-    const docRef = await admin.firestore().collection(collection).add(data);
+    // Check if Firebase admin is properly initialized
+    if (!admin || typeof admin.firestore !== 'function') {
+      return {
+        content: [
+          { type: 'text', text: JSON.stringify({ error: 'Firebase is not properly initialized' }) },
+        ],
+        isError: true,
+      };
+    }
+
+    // Get the Firestore instance
+    const firestore = admin.firestore();
+    if (!firestore) {
+      return {
+        content: [
+          { type: 'text', text: JSON.stringify({ error: 'Firestore instance not available' }) },
+        ],
+        isError: true,
+      };
+    }
+
+    const docRef = await firestore.collection(collection).add(data);
     const serviceAccountPath = process.env.SERVICE_ACCOUNT_KEY_PATH;
     if (!serviceAccountPath) {
       return {
-        content: [{ type: 'error', text: 'Service account path not set' }],
+        content: [
+          { type: 'text', text: JSON.stringify({ error: 'Service account path not set' }) },
+        ],
         isError: true,
       };
     }
@@ -218,7 +312,9 @@ export async function addDocument(collection: string, data: object): Promise<Fir
     const projectId = getProjectId(serviceAccountPath);
     if (!projectId) {
       return {
-        content: [{ type: 'error', text: 'Could not determine project ID' }],
+        content: [
+          { type: 'text', text: JSON.stringify({ error: 'Could not determine project ID' }) },
+        ],
         isError: true,
       };
     }
@@ -231,7 +327,7 @@ export async function addDocument(collection: string, data: object): Promise<Fir
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     return {
-      content: [{ type: 'error', text: errorMessage }],
+      content: [{ type: 'text', text: JSON.stringify({ error: errorMessage }) }],
       isError: true,
     };
   }
@@ -251,11 +347,34 @@ export async function addDocument(collection: string, data: object): Promise<Fir
  */
 export async function getDocument(collection: string, id: string): Promise<FirestoreResponse> {
   try {
-    const doc = await admin.firestore().collection(collection).doc(id).get();
+    // Check if Firebase admin is properly initialized
+    if (!admin || typeof admin.firestore !== 'function') {
+      return {
+        content: [
+          { type: 'text', text: JSON.stringify({ error: 'Firebase is not properly initialized' }) },
+        ],
+        isError: true,
+      };
+    }
+
+    // Get the Firestore instance
+    const firestore = admin.firestore();
+    if (!firestore) {
+      return {
+        content: [
+          { type: 'text', text: JSON.stringify({ error: 'Firestore instance not available' }) },
+        ],
+        isError: true,
+      };
+    }
+
+    const doc = await firestore.collection(collection).doc(id).get();
     const serviceAccountPath = process.env.SERVICE_ACCOUNT_KEY_PATH;
     if (!serviceAccountPath) {
       return {
-        content: [{ type: 'error', text: 'Service account path not set' }],
+        content: [
+          { type: 'text', text: JSON.stringify({ error: 'Service account path not set' }) },
+        ],
         isError: true,
       };
     }
@@ -263,14 +382,16 @@ export async function getDocument(collection: string, id: string): Promise<Fires
     const projectId = getProjectId(serviceAccountPath);
     if (!projectId) {
       return {
-        content: [{ type: 'error', text: 'Could not determine project ID' }],
+        content: [
+          { type: 'text', text: JSON.stringify({ error: 'Could not determine project ID' }) },
+        ],
         isError: true,
       };
     }
 
     if (!doc.exists) {
       return {
-        content: [{ type: 'error', text: `Document not found: ${id}` }],
+        content: [{ type: 'text', text: JSON.stringify({ error: `Document not found: ${id}` }) }],
         isError: true,
       };
     }
@@ -285,7 +406,7 @@ export async function getDocument(collection: string, id: string): Promise<Fires
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     return {
-      content: [{ type: 'error', text: errorMessage }],
+      content: [{ type: 'text', text: JSON.stringify({ error: errorMessage }) }],
       isError: true,
     };
   }
@@ -313,11 +434,34 @@ export async function updateDocument(
   data: object
 ): Promise<FirestoreResponse> {
   try {
-    await admin.firestore().collection(collection).doc(id).update(data);
+    // Check if Firebase admin is properly initialized
+    if (!admin || typeof admin.firestore !== 'function') {
+      return {
+        content: [
+          { type: 'text', text: JSON.stringify({ error: 'Firebase is not properly initialized' }) },
+        ],
+        isError: true,
+      };
+    }
+
+    // Get the Firestore instance
+    const firestore = admin.firestore();
+    if (!firestore) {
+      return {
+        content: [
+          { type: 'text', text: JSON.stringify({ error: 'Firestore instance not available' }) },
+        ],
+        isError: true,
+      };
+    }
+
+    await firestore.collection(collection).doc(id).update(data);
     const serviceAccountPath = process.env.SERVICE_ACCOUNT_KEY_PATH;
     if (!serviceAccountPath) {
       return {
-        content: [{ type: 'error', text: 'Service account path not set' }],
+        content: [
+          { type: 'text', text: JSON.stringify({ error: 'Service account path not set' }) },
+        ],
         isError: true,
       };
     }
@@ -325,7 +469,9 @@ export async function updateDocument(
     const projectId = getProjectId(serviceAccountPath);
     if (!projectId) {
       return {
-        content: [{ type: 'error', text: 'Could not determine project ID' }],
+        content: [
+          { type: 'text', text: JSON.stringify({ error: 'Could not determine project ID' }) },
+        ],
         isError: true,
       };
     }
@@ -338,7 +484,7 @@ export async function updateDocument(
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     return {
-      content: [{ type: 'error', text: errorMessage }],
+      content: [{ type: 'text', text: JSON.stringify({ error: errorMessage }) }],
       isError: true,
     };
   }
@@ -358,12 +504,33 @@ export async function updateDocument(
  */
 export async function deleteDocument(collection: string, id: string): Promise<FirestoreResponse> {
   try {
-    const docRef = admin.firestore().collection(collection).doc(id);
+    // Check if Firebase admin is properly initialized
+    if (!admin || typeof admin.firestore !== 'function') {
+      return {
+        content: [
+          { type: 'text', text: JSON.stringify({ error: 'Firebase is not properly initialized' }) },
+        ],
+        isError: true,
+      };
+    }
+
+    // Get the Firestore instance
+    const firestore = admin.firestore();
+    if (!firestore) {
+      return {
+        content: [
+          { type: 'text', text: JSON.stringify({ error: 'Firestore instance not available' }) },
+        ],
+        isError: true,
+      };
+    }
+
+    const docRef = firestore.collection(collection).doc(id);
     const doc = await docRef.get();
 
     if (!doc.exists) {
       return {
-        content: [{ type: 'error', text: 'no entity to delete' }],
+        content: [{ type: 'text', text: JSON.stringify({ error: 'no entity to delete' }) }],
         isError: true,
       };
     }
@@ -375,7 +542,7 @@ export async function deleteDocument(collection: string, id: string): Promise<Fi
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     return {
-      content: [{ type: 'error', text: errorMessage }],
+      content: [{ type: 'text', text: JSON.stringify({ error: errorMessage }) }],
       isError: true,
     };
   }
@@ -411,9 +578,30 @@ export async function queryCollectionGroup(
   pageToken?: string
 ): Promise<FirestoreResponse> {
   try {
+    // Check if Firebase admin is properly initialized
+    if (!admin || typeof admin.firestore !== 'function') {
+      return {
+        content: [
+          { type: 'text', text: JSON.stringify({ error: 'Firebase is not properly initialized' }) },
+        ],
+        isError: true,
+      };
+    }
+
+    // Get the Firestore instance
+    const firestore = admin.firestore();
+    if (!firestore) {
+      return {
+        content: [
+          { type: 'text', text: JSON.stringify({ error: 'Firestore instance not available' }) },
+        ],
+        isError: true,
+      };
+    }
+
     // Use any to bypass TypeScript type check for collectionGroup
     // The Firebase types are sometimes inconsistent between versions
-    let query: FirebaseFirestore.Query = admin.firestore().collectionGroup(collectionId);
+    let query: FirebaseFirestore.Query = firestore.collectionGroup(collectionId);
 
     // Apply filters if provided
     if (filters && filters.length > 0) {
@@ -432,7 +620,7 @@ export async function queryCollectionGroup(
     // Apply pagination if pageToken is provided
     if (pageToken) {
       try {
-        const lastDoc = await admin.firestore().doc(pageToken).get();
+        const lastDoc = await firestore.doc(pageToken).get();
         if (lastDoc.exists) {
           query = query.startAfter(lastDoc);
         }
@@ -440,8 +628,10 @@ export async function queryCollectionGroup(
         return {
           content: [
             {
-              type: 'error',
-              text: `Invalid pagination token: ${error instanceof Error ? error.message : 'Unknown error'}`,
+              type: 'text',
+              text: JSON.stringify({
+                error: `Invalid pagination token: ${error instanceof Error ? error.message : 'Unknown error'}`,
+              }),
             },
           ],
           isError: true,
@@ -456,7 +646,9 @@ export async function queryCollectionGroup(
     const serviceAccountPath = process.env.SERVICE_ACCOUNT_KEY_PATH;
     if (!serviceAccountPath) {
       return {
-        content: [{ type: 'error', text: 'Service account path not set' }],
+        content: [
+          { type: 'text', text: JSON.stringify({ error: 'Service account path not set' }) },
+        ],
         isError: true,
       };
     }
@@ -464,7 +656,9 @@ export async function queryCollectionGroup(
     const projectId = getProjectId(serviceAccountPath);
     if (!projectId) {
       return {
-        content: [{ type: 'error', text: 'Could not determine project ID' }],
+        content: [
+          { type: 'text', text: JSON.stringify({ error: 'Could not determine project ID' }) },
+        ],
         isError: true,
       };
     }
@@ -499,7 +693,7 @@ export async function queryCollectionGroup(
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     return {
-      content: [{ type: 'error', text: errorMessage }],
+      content: [{ type: 'text', text: JSON.stringify({ error: errorMessage }) }],
       isError: true,
     };
   }
