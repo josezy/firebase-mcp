@@ -109,9 +109,8 @@ export async function list_collections(
     // Check if Firebase admin is properly initialized
     if (!adminToUse || typeof adminToUse.firestore !== 'function') {
       return {
-        content: [
-          { type: 'text', text: JSON.stringify({ error: 'Firebase is not properly initialized' }) },
-        ],
+        content: [{ type: 'text', text: JSON.stringify({ error: 'Firebase not initialized' }) }],
+        isError: true,
       };
     }
 
@@ -122,6 +121,7 @@ export async function list_collections(
         content: [
           { type: 'text', text: JSON.stringify({ error: 'Firestore instance not available' }) },
         ],
+        isError: true,
       };
     }
 
@@ -132,6 +132,7 @@ export async function list_collections(
         content: [
           { type: 'text', text: JSON.stringify({ error: 'Service account path not set' }) },
         ],
+        isError: true,
       };
     }
 
@@ -141,6 +142,7 @@ export async function list_collections(
         content: [
           { type: 'text', text: JSON.stringify({ error: 'Could not determine project ID' }) },
         ],
+        isError: true,
       };
     }
 
@@ -188,6 +190,7 @@ export async function list_collections(
             }),
           },
         ],
+        isError: true,
       };
     }
 
@@ -207,6 +210,7 @@ export async function list_collections(
     // Always use 'text' type for error responses too
     return {
       content: [{ type: 'text', text: JSON.stringify({ error: errorMessage }) }],
+      isError: true,
     };
   }
 }
