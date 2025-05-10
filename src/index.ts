@@ -1254,7 +1254,8 @@ class FirebaseMcpServer {
               // Log the response for debugging
               logger.debug(`Found collections in response`);
 
-              // Return the response directly
+              // Return the response directly without additional parsing
+              // This avoids any potential issues with double parsing
               return {
                 content: [
                   {

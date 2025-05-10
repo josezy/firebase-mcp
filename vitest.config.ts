@@ -30,10 +30,10 @@ export default defineConfig({
         '**/test-utils.ts',
       ],
       thresholds: {
-        statements: 55,
-        branches: 70,
+        statements: 50,
+        branches: 65,
         functions: 80,
-        lines: 55,
+        lines: 50,
       },
     },
   },

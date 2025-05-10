@@ -11,10 +11,70 @@
 import { Timestamp } from 'firebase-admin/firestore';
 import { getProjectId } from './firebaseConfig.js';
 import * as admin from 'firebase-admin';
+import { logger } from '../../utils/logger.js';
 
 interface FirestoreResponse {
   content: Array<{ type: string; text: string }>;
   isError?: boolean;
+}
+
+/**
+ * Executes a function with stdout filtering to prevent Firebase SDK debug output
+ * from interfering with JSON-RPC communication.
+ *
+ * @param fn The function to execute with filtered stdout
+ * @returns The result of the function
+ */
+async function withFilteredStdout<T>(fn: () => Promise<T>): Promise<T> {
+  // Save the original stdout.write
+  const originalStdoutWrite = process.stdout.write.bind(process.stdout);
+
+  // Debug counters
+  let filteredMessages = 0;
+
+  // Create a filtered version
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  process.stdout.write = function (this: any, chunk: any, ...args: any[]): boolean {
+    // Convert chunk to string if it's a buffer
+    const str = Buffer.isBuffer(chunk) ? chunk.toString() : String(chunk);
+
+    // Check if this is a Firebase SDK debug message
+    if (
+      str.includes('parent:') ||
+      str.includes('pageSize:') ||
+      str.includes('CallSettings') ||
+      str.includes('retry:')
+    ) {
+      // Skip writing this to stdout
+      filteredMessages++;
+
+      // Log filtered messages for debugging (not to stdout)
+      logger.debug(`Filtered Firebase SDK debug message: ${str.substring(0, 50)}...`);
+
+      // Call the callback if provided
+      const callback = args.length >= 2 ? args[1] : args[0];
+      if (typeof callback === 'function') {
+        callback();
+      }
+      return true;
+    }
+
+    // Otherwise, call the original method
+    return originalStdoutWrite(chunk, ...args);
+  };
+
+  try {
+    // Execute the function
+    return await fn();
+  } finally {
+    // Restore the original stdout.write
+    process.stdout.write = originalStdoutWrite;
+
+    // Log how many messages were filtered
+    if (filteredMessages > 0) {
+      logger.debug(`Filtered ${filteredMessages} Firebase SDK debug messages`);
+    }
+  }
 }
 
 /**
@@ -49,9 +109,7 @@ export async function list_collections(
     // Check if Firebase admin is properly initialized
     if (!adminToUse || typeof adminToUse.firestore !== 'function') {
       return {
-        content: [
-          { type: 'text', text: JSON.stringify({ error: 'Firebase is not properly initialized' }) },
-        ],
+        content: [{ type: 'text', text: JSON.stringify({ error: 'Firebase not initialized' }) }],
         isError: true,
       };
     }
@@ -67,11 +125,7 @@ export async function list_collections(
       };
     }
 
-    // Get collections but don't store or log the raw objects
-    const collections = documentPath
-      ? await firestore.doc(documentPath).listCollections()
-      : await firestore.listCollections();
-
+    // Get the service account path for project ID
     const serviceAccountPath = process.env.SERVICE_ACCOUNT_KEY_PATH;
     if (!serviceAccountPath) {
       return {
@@ -92,31 +146,64 @@ export async function list_collections(
       };
     }
 
-    // Immediately extract only the properties we need into a new array
-    // This ensures no references to the original objects are maintained
-    const safeCollections = [];
-    for (const collection of collections) {
-      // Create a completely new object with only string properties
-      const collectionUrl = `https://console.firebase.google.com/project/${projectId}/firestore/data/${documentPath || ''}${documentPath ? '/' : ''}${collection.id}`;
-      safeCollections.push({
-        id: typeof collection.id === 'string' ? collection.id : String(collection.id || ''),
-        path: typeof collection.path === 'string' ? collection.path : String(collection.path || ''),
-        url: collectionUrl,
+    // Create a safe array to hold collection information
+    const safeCollections: Array<{ id: string; path: string; url: string }> = [];
+
+    try {
+      // Get collections using the Firestore API with stdout filtering
+      logger.debug('Calling listCollections() with stdout filtering');
+
+      // Use our utility function to filter stdout during the listCollections() call
+      const collectionsRef = await withFilteredStdout(async () => {
+        return documentPath
+          ? await firestore.doc(documentPath).listCollections()
+          : await firestore.listCollections();
       });
+
+      logger.debug(`Successfully retrieved collections with stdout filtering`);
+
+      // Important: Convert the collection references to a simple array of objects
+      // This avoids any issues with circular references or non-serializable properties
+      for (const collection of collectionsRef) {
+        // Extract only the string properties we need
+        const id = String(collection.id || '');
+        const path = String(collection.path || '');
+        const collectionUrl = `https://console.firebase.google.com/project/${projectId}/firestore/data/${documentPath || ''}${documentPath ? '/' : ''}${id}`;
+
+        // Add to our safe array
+        safeCollections.push({
+          id: id,
+          path: path,
+          url: collectionUrl,
+        });
+      }
+    } catch (collectionError) {
+      // Log the error but continue with an empty array
+      return {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify({
+              error: 'Error listing collections',
+              message: collectionError instanceof Error ? collectionError.message : 'Unknown error',
+              collections: [],
+            }),
+          },
+        ],
+        isError: true,
+      };
     }
 
-    // Create a clean result object
-    const result = { collections: safeCollections };
+    // Create a result object with our safe collections
+    const result = {
+      collections: safeCollections,
+      path: documentPath || 'root',
+      projectId: projectId,
+    };
 
-    // Stringify the result to ensure it's valid JSON
-    const jsonString = JSON.stringify(result);
-
-    // Parse it back to ensure it's a clean object
-    const cleanResult = JSON.parse(jsonString);
-
-    // Always use 'text' type for content to ensure proper handling by MCP clients
+    // Return a clean JSON response
     return {
-      content: [{ type: 'text', text: JSON.stringify(cleanResult) }],
+      content: [{ type: 'text', text: JSON.stringify(result) }],
     };
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
