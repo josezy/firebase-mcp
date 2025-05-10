@@ -19,6 +19,8 @@
 
 The server works with MCP client applicatios such as [Claude Desktop](https://claude.ai/download), [Augment Code](https://docs.augmentcode.com/setup-augment/mcp), [VS Code](https://code.visualstudio.com/docs/copilot/chat/mcp-servers), and [Cursor](https://www.cursor.com/).
 
+> ⚠️ **Known Issue**: The `firestore_list_collections` tool may return a Zod validation error in the client logs. This is an erroneous validation error in the MCP SDK, as our investigation confirmed no boolean values are present in the response. Despite the error message, the query still works correctly and returns the proper collection data. This is a log-level error that doesn't affect functionality.
+
 ## ⚡ Quick Start
 
 ### Prerequisites
@@ -74,56 +76,6 @@ MCP Servers can be installed manually or at runtime via npx (recommended). How y
 ### 2. Test the Installation
 
 Ask your AI client: "Please test all Firebase MCP tools."
-
-## 🔥 Latest Features: Storage Upload (v1.3.3)
-
-Firebase MCP now offers powerful file upload capabilities with two specialized tools:
-
-- **`storage_upload`**: Upload files from text, base64 content, or local file paths
-- **`storage_upload_from_url`**: Import files directly from external URLs
-
-### Key Benefits
-
-- **Permanent Public URLs**: All uploads generate non-expiring public URLs
-- **Content Type Detection**: Automatic detection from file extensions and data
-- **Multiple Upload Methods**: Flexible options for different use cases
-- **Rich Response Formatting**: Clear, well-structured upload confirmations
-
-### Upload Methods
-
-1. **Local File Path** (Recommended for all file types)
-   ```ts
-   {
-     filePath: "my-report.pdf",
-     content: "/path/to/local/file.pdf"
-   }
-   ```
-
-2. **Base64 Data URL** (For smaller files)
-   ```ts
-   {
-     filePath: "my-image.png",
-     content: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAA..."
-   }
-   ```
-
-3. **Plain Text** (For text files)
-   ```ts
-   {
-     filePath: "readme.md",
-     content: "# My README\n\nThis is a markdown file."
-   }
-   ```
-
-4. **External URL** (Using storage_upload_from_url)
-   ```ts
-   {
-     filePath: "document.pdf",
-     url: "https://example.com/document.pdf"
-   }
-   ```
-
-> ⚠️ **Important:** For binary files like images and PDFs, always use the direct file path method for best reliability.
 
 ## 🛠️ Setup & Configuration
 
@@ -282,6 +234,11 @@ If you receive "This query requires a composite index" error:
 1. Look for the provided URL in the error message
 2. Follow the link to create the required index in Firebase Console
 3. Retry your query after the index is created (may take a few minutes)
+
+#### Zod Validation Error with `firestore_list_collections`
+If you see a Zod validation error with message "Expected object, received boolean" when using the `firestore_list_collections` tool:
+
+> ⚠️ **Known Issue**: The `firestore_list_collections` tool may return a Zod validation error in the client logs. This is an erroneous validation error in the MCP SDK, as our investigation confirmed no boolean values are present in the response. Despite the error message, the query still works correctly and returns the proper collection data. This is a log-level error that doesn't affect functionality.
 
 ### Debugging
 
