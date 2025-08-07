@@ -7,7 +7,8 @@
  * from the environment and initializes Firebase with appropriate settings.
  *
  * Environment variables used:
- * - SERVICE_ACCOUNT_KEY_PATH: Path to the Firebase service account key JSON file (required)
+ * - SERVICE_ACCOUNT_KEY: Firebase service account key JSON content (required)
+ * - SERVICE_ACCOUNT_KEY_PATH: Path to the Firebase service account key JSON file (legacy, optional)
  * - FIREBASE_STORAGE_BUCKET: Custom bucket name for Firebase Storage (optional)
  *
  * @module firebase-mcp/config
@@ -47,18 +48,35 @@ function initializeFirebase(): admin.app.App | null {
       // No existing app, continue with initialization
     }
 
-    // Get service account path from environment variables
+    // Get service account from environment variables (JSON content or file path)
+    const serviceAccountKey = process.env.SERVICE_ACCOUNT_KEY;
     const serviceAccountPath = process.env.SERVICE_ACCOUNT_KEY_PATH;
 
-    // Validate service account path is provided
-    if (!serviceAccountPath) {
+    let serviceAccount;
+    let projectId;
+
+    if (serviceAccountKey) {
+      // Parse JSON content directly from environment variable
+      try {
+        serviceAccount = JSON.parse(serviceAccountKey);
+        projectId = serviceAccount.project_id || null;
+      } catch {
+        return null;
+      }
+    } else if (serviceAccountPath) {
+      // Legacy support: read from file path
+      try {
+        serviceAccount = JSON.parse(fs.readFileSync(serviceAccountPath, 'utf8'));
+        projectId = getProjectId(serviceAccountPath);
+      } catch {
+        return null;
+      }
+    } else {
+      // Neither SERVICE_ACCOUNT_KEY nor SERVICE_ACCOUNT_KEY_PATH provided
       return null;
     }
 
     try {
-      // Read and parse the service account key file
-      const serviceAccount = JSON.parse(fs.readFileSync(serviceAccountPath, 'utf8'));
-      const projectId = getProjectId(serviceAccountPath);
 
       // Validate project ID was found in the service account
       if (!projectId) {

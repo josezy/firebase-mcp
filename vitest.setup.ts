@@ -9,11 +9,17 @@ const USE_EMULATOR = process.env.USE_FIREBASE_EMULATOR === 'true';
 const TEST_USER_ID = 'testid';
 const TEST_USER_EMAIL = 'test@example.com';
 const TEST_USER_PASSWORD = 'password123';
+const SERVICE_ACCOUNT_KEY = process.env.SERVICE_ACCOUNT_KEY;
 const SERVICE_ACCOUNT_KEY_PATH =
   process.env.SERVICE_ACCOUNT_KEY_PATH || path.resolve(process.cwd(), 'firebaseServiceKey.json');
 
-// Set the service account key path for environment
-process.env.SERVICE_ACCOUNT_KEY_PATH = SERVICE_ACCOUNT_KEY_PATH;
+// Set environment variables for compatibility
+if (SERVICE_ACCOUNT_KEY) {
+  process.env.SERVICE_ACCOUNT_KEY = SERVICE_ACCOUNT_KEY;
+}
+if (SERVICE_ACCOUNT_KEY_PATH) {
+  process.env.SERVICE_ACCOUNT_KEY_PATH = SERVICE_ACCOUNT_KEY_PATH;
+}
 
 // Initialize Firebase
 function initializeFirebase() {
@@ -38,16 +44,28 @@ function initializeFirebase() {
     }
 
     // For non-emulator mode, we need a real service account
-    const serviceAccountPath = SERVICE_ACCOUNT_KEY_PATH;
-
-    // Check if service account file exists
-    if (!fs.existsSync(serviceAccountPath)) {
+    let serviceAccount;
+    
+    if (SERVICE_ACCOUNT_KEY) {
+      // Parse JSON content directly from environment variable
+      try {
+        serviceAccount = JSON.parse(SERVICE_ACCOUNT_KEY);
+      } catch (error) {
+        throw new Error('Invalid JSON in SERVICE_ACCOUNT_KEY environment variable.');
+      }
+    } else if (SERVICE_ACCOUNT_KEY_PATH) {
+      // Legacy support: read from file path
+      if (!fs.existsSync(SERVICE_ACCOUNT_KEY_PATH)) {
+        throw new Error(
+          `Service account key file not found at ${SERVICE_ACCOUNT_KEY_PATH}. Set SERVICE_ACCOUNT_KEY or SERVICE_ACCOUNT_KEY_PATH or use USE_FIREBASE_EMULATOR=true.`
+        );
+      }
+      serviceAccount = JSON.parse(fs.readFileSync(SERVICE_ACCOUNT_KEY_PATH, 'utf8'));
+    } else {
       throw new Error(
-        `Service account key file not found at ${serviceAccountPath}. Set SERVICE_ACCOUNT_KEY_PATH or use USE_FIREBASE_EMULATOR=true.`
+        'No Firebase service account configured. Set SERVICE_ACCOUNT_KEY or SERVICE_ACCOUNT_KEY_PATH or use USE_FIREBASE_EMULATOR=true.'
       );
     }
-
-    const serviceAccount = JSON.parse(fs.readFileSync(serviceAccountPath, 'utf8'));
 
     // Check if Firebase is already initialized
     if (admin.apps.length === 0) {

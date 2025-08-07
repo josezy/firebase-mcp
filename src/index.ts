@@ -27,9 +27,12 @@ import * as fs from 'fs';
 // Initialize Firebase
 async function initializeFirebase(): Promise<admin.app.App | null> {
   try {
+    const serviceAccountKey = config.serviceAccountKey;
     const serviceAccountPath = config.serviceAccountKeyPath;
-    if (!serviceAccountPath) {
-      logger.error('SERVICE_ACCOUNT_KEY_PATH not set');
+
+    // Check if we have either service account key or path
+    if (!serviceAccountKey && !serviceAccountPath) {
+      logger.error('Neither SERVICE_ACCOUNT_KEY nor SERVICE_ACCOUNT_KEY_PATH is set');
       return null;
     }
 
@@ -44,30 +47,43 @@ async function initializeFirebase(): Promise<admin.app.App | null> {
       logger.debug('No existing Firebase app, initializing new one');
     }
 
-    // Read the service account key file
-    try {
-      const serviceAccountContent = fs.readFileSync(serviceAccountPath, 'utf8');
-      logger.debug(`Service account file read successfully: ${serviceAccountPath}`);
-
-      const serviceAccount = JSON.parse(serviceAccountContent);
-      logger.debug(
-        `Service account parsed successfully: ${Object.keys(serviceAccount).join(', ')}`
-      );
-
-      const storageBucket = config.storageBucket || undefined;
-      logger.debug(`Initializing Firebase with storage bucket: ${storageBucket}`);
-
-      // Initialize Firebase with the service account
-      return admin.initializeApp({
-        credential: admin.credential.cert(serviceAccount),
-        storageBucket: storageBucket,
-      });
-    } catch (error) {
-      logger.error(
-        `Error initializing Firebase: ${error instanceof Error ? error.message : 'Unknown error'}`
-      );
-      return null;
+    let serviceAccount;
+    
+    if (serviceAccountKey) {
+      // Parse JSON content directly from environment variable
+      try {
+        serviceAccount = JSON.parse(serviceAccountKey);
+        logger.debug('Service account parsed from SERVICE_ACCOUNT_KEY environment variable');
+      } catch (error) {
+        logger.error('Invalid JSON in SERVICE_ACCOUNT_KEY environment variable');
+        return null;
+      }
+    } else if (serviceAccountPath) {
+      // Legacy support: read from file path
+      try {
+        const serviceAccountContent = fs.readFileSync(serviceAccountPath, 'utf8');
+        logger.debug(`Service account file read successfully: ${serviceAccountPath}`);
+        serviceAccount = JSON.parse(serviceAccountContent);
+      } catch (error) {
+        logger.error(
+          `Error reading service account file: ${error instanceof Error ? error.message : 'Unknown error'}`
+        );
+        return null;
+      }
     }
+
+    logger.debug(
+      `Service account parsed successfully: ${Object.keys(serviceAccount).join(', ')}`
+    );
+
+    const storageBucket = config.storageBucket || undefined;
+    logger.debug(`Initializing Firebase with storage bucket: ${storageBucket}`);
+
+    // Initialize Firebase with the service account
+    return admin.initializeApp({
+      credential: admin.credential.cert(serviceAccount),
+      storageBucket: storageBucket,
+    });
   } catch (error) {
     logger.error('Failed to initialize Firebase', error);
     return null;

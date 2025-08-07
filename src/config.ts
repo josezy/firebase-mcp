@@ -5,7 +5,8 @@
  * It handles environment variable parsing and provides default values for various settings.
  *
  * Environment variables:
- * - SERVICE_ACCOUNT_KEY_PATH: Path to Firebase service account key (required)
+ * - SERVICE_ACCOUNT_KEY: Firebase service account key JSON content (required)
+ * - SERVICE_ACCOUNT_KEY_PATH: Path to Firebase service account key (legacy, optional)
  * - FIREBASE_STORAGE_BUCKET: Firebase Storage bucket name (optional)
  * - MCP_TRANSPORT: Transport type to use (stdio, http) (default: stdio)
  * - MCP_HTTP_PORT: Port for HTTP transport (default: 3000)
@@ -34,7 +35,9 @@ export enum TransportType {
  * Server configuration interface
  */
 export interface ServerConfig {
-  /** Firebase service account key path */
+  /** Firebase service account key JSON content */
+  serviceAccountKey: string | null;
+  /** Firebase service account key path (legacy) */
   serviceAccountKeyPath: string | null;
   /** Firebase storage bucket name */
   storageBucket: string | null;
@@ -121,6 +124,7 @@ export function getConfig(): ServerConfig {
   // Create configuration object
   const config: ServerConfig = {
     // Client-provided environment variables take precedence over .env
+    serviceAccountKey: process.env.SERVICE_ACCOUNT_KEY || null,
     serviceAccountKeyPath: process.env.SERVICE_ACCOUNT_KEY_PATH || null,
     storageBucket: process.env.FIREBASE_STORAGE_BUCKET || null,
     transport,

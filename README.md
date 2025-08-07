@@ -48,7 +48,7 @@ MCP Servers can be installed manually or at runtime via npx (recommended). How y
          "@gannonh/firebase-mcp"
        ],
        "env": {
-         "SERVICE_ACCOUNT_KEY_PATH": "/absolute/path/to/serviceAccountKey.json",
+         "SERVICE_ACCOUNT_KEY": "{\"type\":\"service_account\",\"project_id\":\"your-project\",\"private_key_id\":\"...\",\"private_key\":\"...\",\"client_email\":\"...\",\"client_id\":\"...\",\"auth_uri\":\"...\",\"token_uri\":\"...\",\"auth_provider_x509_cert_url\":\"...\",\"client_x509_cert_url\":\"...\"}",
          "FIREBASE_STORAGE_BUCKET": "your-project-id.firebasestorage.app"
        }
      }
@@ -65,7 +65,7 @@ MCP Servers can be installed manually or at runtime via npx (recommended). How y
          "/absolute/path/to/firebase-mcp/dist/index.js"
        ],
        "env": {
-         "SERVICE_ACCOUNT_KEY_PATH": "/absolute/path/to/serviceAccountKey.json",
+         "SERVICE_ACCOUNT_KEY": "{\"type\":\"service_account\",\"project_id\":\"your-project\",\"private_key_id\":\"...\",\"private_key\":\"...\",\"client_email\":\"...\",\"client_id\":\"...\",\"auth_uri\":\"...\",\"token_uri\":\"...\",\"auth_provider_x509_cert_url\":\"...\",\"client_x509_cert_url\":\"...\"}",
          "FIREBASE_STORAGE_BUCKET": "your-project-id.firebasestorage.app"
        }
      }
@@ -88,7 +88,8 @@ Ask your AI client: "Please test all Firebase MCP tools."
 ### 2. Environment Variables
 
 #### Required
-- `SERVICE_ACCOUNT_KEY_PATH`: Path to your Firebase service account key JSON (required)
+- `SERVICE_ACCOUNT_KEY`: Your Firebase service account key JSON content as a string (required)
+- `SERVICE_ACCOUNT_KEY_PATH`: Path to your Firebase service account key JSON (legacy, optional)
 
 #### Optional
 - `FIREBASE_STORAGE_BUCKET`: Bucket name for Firebase Storage (defaults to `[projectId].appspot.com`)
@@ -261,7 +262,7 @@ You can also enable logging in your MCP client configuration:
     "command": "npx",
     "args": ["-y", "@gannonh/firebase-mcp"],
     "env": {
-      "SERVICE_ACCOUNT_KEY_PATH": "/path/to/serviceAccountKey.json",
+      "SERVICE_ACCOUNT_KEY": "{\"type\":\"service_account\",\"project_id\":\"your-project\",\"private_key_id\":\"...\",\"private_key\":\"...\",\"client_email\":\"...\",\"client_id\":\"...\",\"auth_uri\":\"...\",\"token_uri\":\"...\",\"auth_provider_x509_cert_url\":\"...\",\"client_x509_cert_url\":\"...\"}",
       "FIREBASE_STORAGE_BUCKET": "your-project-id.firebasestorage.app",
       "DEBUG_LOG_FILE": "true"
     }
