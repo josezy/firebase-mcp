@@ -58,7 +58,6 @@ export async function initializeHttpTransport(server: Server, config: ServerConf
         return;
       }
 
-      logger.debug('Token authentication successful');
       next();
     });
     
