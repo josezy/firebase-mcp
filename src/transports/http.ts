@@ -25,6 +25,48 @@ export async function initializeHttpTransport(server: Server, config: ServerConf
   const app = express();
   app.use(express.json());
 
+  // Add OAuth token authentication middleware if token is configured
+  if (config.http.token) {
+    app.use((req, res, next) => {
+      const authHeader = req.headers.authorization;
+      
+      if (!authHeader) {
+        logger.warn('Missing Authorization header');
+        res.status(401).json({
+          jsonrpc: '2.0',
+          error: {
+            code: -32000,
+            message: 'Unauthorized: Missing Authorization header',
+          },
+          id: null,
+        });
+        return;
+      }
+
+      const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : authHeader;
+      
+      if (token !== config.http.token) {
+        logger.warn('Invalid token provided');
+        res.status(401).json({
+          jsonrpc: '2.0',
+          error: {
+            code: -32000,
+            message: 'Unauthorized: Invalid token',
+          },
+          id: null,
+        });
+        return;
+      }
+
+      logger.debug('Token authentication successful');
+      next();
+    });
+    
+    logger.info('OAuth token authentication enabled');
+  } else {
+    logger.info('OAuth token authentication disabled (no MCP_HTTP_TOKEN set)');
+  }
+
   // Map to store transports by session ID
   const transports: { [sessionId: string]: StreamableHTTPServerTransport } = {};
 

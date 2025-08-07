@@ -12,6 +12,7 @@
  * - MCP_HTTP_PORT: Port for HTTP transport (default: 3000)
  * - MCP_HTTP_HOST: Host for HTTP transport (default: localhost)
  * - MCP_HTTP_PATH: Path for HTTP transport (default: /mcp)
+ * - MCP_HTTP_TOKEN: OAuth token for HTTP transport authentication (optional)
  *
  * @module firebase-mcp/config
  */
@@ -51,6 +52,8 @@ export interface ServerConfig {
     host: string;
     /** HTTP path */
     path: string;
+    /** OAuth token for authentication (optional) */
+    token: string | null;
   };
   /** Server version */
   version: string;
@@ -132,6 +135,7 @@ export function getConfig(): ServerConfig {
       port: parseInt(process.env.MCP_HTTP_PORT || '3000', 10),
       host: process.env.MCP_HTTP_HOST || 'localhost',
       path: process.env.MCP_HTTP_PATH || '/mcp',
+      token: process.env.MCP_HTTP_TOKEN || null,
     },
     version: process.env.npm_package_version || '1.3.5',
     name: 'firebase-mcp',
