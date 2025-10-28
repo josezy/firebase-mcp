@@ -2,6 +2,7 @@
 # See https://firebase.google.com/docs/app-hosting/configure#cloud-run
 runConfig:
   minInstances: 0
+  containerPort: 3000
   # maxInstances: 100
   # concurrency: 80
   # cpu: 1
