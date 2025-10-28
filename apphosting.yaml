@@ -32,6 +32,6 @@ env:
       - RUNTIME
 
   - variable: MCP_HTTP_TOKEN
-    secret: MCP_HTTP_TOKEN
+    secret: MCP_AUTH_TOKEN
     availability:
       - RUNTIME
