@@ -1,0 +1,32 @@
+# Settings for Backend (on Cloud Run).
+# See https://firebase.google.com/docs/app-hosting/configure#cloud-run
+runConfig:
+  minInstances: 0
+  # maxInstances: 100
+  # concurrency: 80
+  # cpu: 1
+  # memoryMiB: 512
+
+# Environment variables and secrets.
+env:
+  # Regular environment variables
+  - variable: MCP_HTTP_HOST
+    value: 0.0.0.0
+    availability:
+      - RUNTIME
+
+  - variable: MCP_TRANSPORT
+    value: http
+    availability:
+      - RUNTIME
+
+  # Secrets from Cloud Secret Manager
+  - variable: SERVICE_ACCOUNT_KEY
+    secret: SERVICE_ACCOUNT_KEY
+    availability:
+      - RUNTIME
+
+  - variable: MCP_HTTP_TOKEN
+    secret: MCP_HTTP_TOKEN
+    availability:
+      - RUNTIME
