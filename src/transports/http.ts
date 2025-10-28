@@ -146,6 +146,15 @@ export async function initializeHttpTransport(server: Server, config: ServerConf
     );
   });
 
+  // Configure timeouts to allow long-running MCP operations
+  serverInstance.setTimeout(300000);        // 5 minutes
+  serverInstance.keepAliveTimeout = 300000; // 5 minutes
+  serverInstance.headersTimeout = 301000;   // Slightly more than keepAlive
+  if ('requestTimeout' in serverInstance) {
+    (serverInstance as any).requestTimeout = 300000; // 5 minutes (Node 18+)
+  }
+  logger.info('HTTP server timeouts configured: 5 minutes');
+
   // Handle server errors (if the server instance has an 'on' method)
   if (serverInstance && typeof serverInstance.on === 'function') {
     serverInstance.on('error', error => {
